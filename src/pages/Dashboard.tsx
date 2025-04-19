@@ -1,0 +1,285 @@
+import { useEffect, useMemo } from 'react';
+import {
+  Box,
+  Heading,
+  SimpleGrid,
+  Text,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Card,
+  CardBody,
+  HStack,
+  VStack,
+  Progress,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Badge,
+  Flex,
+  Spinner
+} from '@chakra-ui/react';
+import { useTimeEntries } from '../contexts/TimeEntryContext';
+import { useProjects } from '../contexts/ProjectContext';
+import { useExpenses } from '../contexts/ExpenseContext';
+
+const Dashboard = () => {
+  const { timeEntries, fetchTimeEntries, isLoading: timeLoading } = useTimeEntries();
+  const { projects, fetchProjects, isLoading: projectsLoading } = useProjects();
+  const { expenses, fetchExpenses, isLoading: expensesLoading } = useExpenses();
+  
+  useEffect(() => {
+    fetchTimeEntries();
+    fetchProjects();
+    fetchExpenses();
+  }, []);
+  
+  // 今日の日付
+  const today = new Date().toISOString().split('T')[0];
+  
+  // 今日の時間
+  const todayHours = useMemo(() => {
+    return timeEntries
+      .filter(entry => entry.date === today)
+      .reduce((total, entry) => total + entry.duration, 0);
+  }, [timeEntries, today]);
+  
+  // 今週の時間
+  const weekHours = useMemo(() => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // 週の始まり（日曜日）
+    
+    return timeEntries
+      .filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= startOfWeek;
+      })
+      .reduce((total, entry) => total + entry.duration, 0);
+  }, [timeEntries]);
+  
+  // 今月の時間
+  const monthHours = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    return timeEntries
+      .filter(entry => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= startOfMonth;
+      })
+      .reduce((total, entry) => total + entry.duration, 0);
+  }, [timeEntries]);
+  
+  // 未請求金額（例として時間 * 100ドルで計算）
+  const unbilledAmount = useMemo(() => {
+    return timeEntries
+      .filter(entry => entry.isBillable)
+      .reduce((total, entry) => total + entry.duration * 100, 0);
+  }, [timeEntries]);
+  
+  // 最近の時間エントリー（最新5件）
+  const recentTimeEntries = useMemo(() => {
+    return [...timeEntries]
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 5);
+  }, [timeEntries]);
+  
+  // プロジェクト名を取得
+  const getProjectName = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    return project ? project.name : 'Unknown Project';
+  };
+  
+  // プロジェクトの進捗状況
+  const projectProgress = useMemo(() => {
+    return projects.map(project => {
+      // プロジェクトの時間を集計
+      const projectHours = timeEntries
+        .filter(entry => entry.projectId === project.id)
+        .reduce((total, entry) => total + entry.duration, 0);
+      
+      // 予算に対する進捗率を計算（仮定として、予算が時間または金額で設定されているものとする）
+      let progress = 0;
+      if (project.budgetType === 'hourly') {
+        // 時間ベースの予算
+        progress = project.budget ? (projectHours / project.budget) * 100 : 0;
+      } else {
+        // 固定金額の予算
+        const projectCost = projectHours * (project.hourlyRate || 100);
+        progress = project.budget ? (projectCost / project.budget) * 100 : 0;
+      }
+      
+      return {
+        id: project.id,
+        name: project.name,
+        progress: Math.min(progress, 100),
+        status: project.status
+      };
+    })
+    .filter(p => p.status === 'active')
+    .sort((a, b) => b.progress - a.progress) // 進捗率の高い順にソート
+    .slice(0, 5); // 上位5件を表示
+  }, [projects, timeEntries]);
+  
+  // 時間をフォーマット
+  const formatHours = (hours: number) => {
+    return hours.toFixed(1);
+  };
+  
+  // 金額をフォーマット
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+  
+  // 日付をフォーマット
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }).format(date);
+  };
+  
+  // ローディング中の表示
+  if (timeLoading || projectsLoading || expensesLoading) {
+    return (
+      <Flex justify="center" align="center" height="50vh">
+        <Spinner size="xl" />
+      </Flex>
+    );
+  }
+  
+  return (
+    <Box>
+      <Heading mb={6}>Dashboard</Heading>
+      
+      <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={6} mb={8}>
+        <Card>
+          <CardBody>
+            <Stat>
+              <StatLabel>Today's Hours</StatLabel>
+              <StatNumber>{formatHours(todayHours)}</StatNumber>
+              <StatHelpText>{formatDate(today)}</StatHelpText>
+            </Stat>
+          </CardBody>
+        </Card>
+        
+        <Card>
+          <CardBody>
+            <Stat>
+              <StatLabel>This Week</StatLabel>
+              <StatNumber>{formatHours(weekHours)}</StatNumber>
+              <StatHelpText>Week of {
+                formatDate(
+                  new Date(
+                    new Date().setDate(new Date().getDate() - new Date().getDay())
+                  ).toISOString()
+                )
+              }</StatHelpText>
+            </Stat>
+          </CardBody>
+        </Card>
+        
+        <Card>
+          <CardBody>
+            <Stat>
+              <StatLabel>This Month</StatLabel>
+              <StatNumber>{formatHours(monthHours)}</StatNumber>
+              <StatHelpText>{
+                new Date().toLocaleString('default', { month: 'long' })
+              } {new Date().getFullYear()}</StatHelpText>
+            </Stat>
+          </CardBody>
+        </Card>
+        
+        <Card>
+          <CardBody>
+            <Stat>
+              <StatLabel>Unbilled Amount</StatLabel>
+              <StatNumber>{formatAmount(unbilledAmount)}</StatNumber>
+              <StatHelpText>{timeEntries.filter(e => e.isBillable).length} billable entries</StatHelpText>
+            </Stat>
+          </CardBody>
+        </Card>
+      </SimpleGrid>
+      
+      <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
+        <Card>
+          <CardBody>
+            <Heading size="md" mb={4}>Recent Time Entries</Heading>
+            {recentTimeEntries.length > 0 ? (
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th>Date</Th>
+                    <Th>Project</Th>
+                    <Th>Hours</Th>
+                    <Th>Status</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {recentTimeEntries.map(entry => (
+                    <Tr key={entry.id}>
+                      <Td>{formatDate(entry.date)}</Td>
+                      <Td>{getProjectName(entry.projectId)}</Td>
+                      <Td>{formatHours(entry.duration)}</Td>
+                      <Td>
+                        {entry.isRunning ? (
+                          <Badge colorScheme="green">Running</Badge>
+                        ) : (
+                          <Badge colorScheme="blue">Completed</Badge>
+                        )}
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            ) : (
+              <Text>No entries yet</Text>
+            )}
+          </CardBody>
+        </Card>
+        
+        <Card>
+          <CardBody>
+            <Heading size="md" mb={4}>Project Status</Heading>
+            {projectProgress.length > 0 ? (
+              <VStack spacing={4} align="stretch">
+                {projectProgress.map(project => (
+                  <Box key={project.id}>
+                    <HStack justify="space-between" mb={1}>
+                      <Text>{project.name}</Text>
+                      <Text fontWeight="medium">{project.progress.toFixed(0)}%</Text>
+                    </HStack>
+                    <Progress 
+                      value={project.progress} 
+                      colorScheme={
+                        project.progress > 85 ? 'red' : 
+                        project.progress > 60 ? 'yellow' : 
+                        'green'
+                      }
+                      borderRadius="md"
+                    />
+                  </Box>
+                ))}
+              </VStack>
+            ) : (
+              <Text>No active projects</Text>
+            )}
+          </CardBody>
+        </Card>
+      </SimpleGrid>
+    </Box>
+  );
+};
+
+export default Dashboard;
