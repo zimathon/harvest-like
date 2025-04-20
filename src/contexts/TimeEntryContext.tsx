@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
 import { TimeEntry } from '../types';
 import { useAuth } from './AuthContext';
+import * as timeEntryService from '../services/timeEntryService';
 
 // 時間記録状態の型定義
 interface TimeEntryState {
@@ -102,49 +103,6 @@ const timeEntryReducer = (state: TimeEntryState, action: TimeEntryAction): TimeE
   }
 };
 
-// モックデータ
-const mockTimeEntries: TimeEntry[] = [
-  {
-    id: '1',
-    userId: '1',
-    projectId: '1',
-    taskId: '1',
-    date: '2025-04-19',
-    duration: 2.5,
-    notes: 'Working on homepage redesign',
-    isBillable: true,
-    isRunning: false,
-    createdAt: '2025-04-19T09:00:00Z',
-    updatedAt: '2025-04-19T11:30:00Z'
-  },
-  {
-    id: '2',
-    userId: '1',
-    projectId: '2',
-    taskId: '2',
-    date: '2025-04-19',
-    duration: 1.75,
-    notes: 'Mobile app UI implementation',
-    isBillable: true,
-    isRunning: false,
-    createdAt: '2025-04-19T13:00:00Z',
-    updatedAt: '2025-04-19T14:45:00Z'
-  },
-  {
-    id: '3',
-    userId: '1',
-    projectId: '1',
-    taskId: '3',
-    date: '2025-04-18',
-    duration: 1,
-    notes: 'Team meeting',
-    isBillable: false,
-    isRunning: false,
-    createdAt: '2025-04-18T15:00:00Z',
-    updatedAt: '2025-04-18T16:00:00Z'
-  }
-];
-
 // プロバイダーコンポーネント
 export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(timeEntryReducer, initialState);
@@ -156,23 +114,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     
     dispatch({ type: 'FETCH_ENTRIES_START' });
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // ローカルストレージからデータ取得を試みる
-      const storedEntries = localStorage.getItem('timeEntries');
-      let entries: TimeEntry[] = [];
-      
-      if (storedEntries) {
-        entries = JSON.parse(storedEntries);
-        // 現在のユーザーのエントリーのみをフィルタリング
-        entries = entries.filter(entry => entry.userId === user.id);
-      } else {
-        // 初回はモックデータを使用
-        entries = mockTimeEntries;
-        localStorage.setItem('timeEntries', JSON.stringify(entries));
-      }
+      // APIから時間エントリーを取得
+      const entries = await timeEntryService.getMyTimeEntries();
       
       // アクティブなタイマーを検索
       const activeEntry = entries.find(entry => entry.isRunning);
@@ -194,27 +137,9 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     if (!user) throw new Error('User not authenticated');
     
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const now = new Date().toISOString();
-      const newEntry: TimeEntry = {
-        id: Date.now().toString(),
-        ...entryData,
-        userId: user.id,
-        createdAt: now,
-        updatedAt: now
-      };
-      
+      // APIを使用して時間エントリーを作成
+      const newEntry = await timeEntryService.createTimeEntry(entryData);
       dispatch({ type: 'ADD_ENTRY', payload: newEntry });
-      
-      // ローカルストレージを更新
-      const storedEntries = localStorage.getItem('timeEntries');
-      let entries: TimeEntry[] = storedEntries ? JSON.parse(storedEntries) : [];
-      entries.push(newEntry);
-      localStorage.setItem('timeEntries', JSON.stringify(entries));
-      
       return newEntry;
     } catch (error) {
       throw new Error('Failed to add time entry');
@@ -224,32 +149,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
   // 時間記録更新
   const updateTimeEntry = async (id: string, entryData: Partial<TimeEntry>) => {
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // 既存エントリーを取得
-      const storedEntries = localStorage.getItem('timeEntries');
-      let entries: TimeEntry[] = storedEntries ? JSON.parse(storedEntries) : [];
-      const existingEntry = entries.find(e => e.id === id);
-      
-      if (!existingEntry) {
-        throw new Error('Time entry not found');
-      }
-      
-      // エントリーを更新
-      const updatedEntry: TimeEntry = {
-        ...existingEntry,
-        ...entryData,
-        updatedAt: new Date().toISOString()
-      };
-      
-      // ローカルストレージを更新
-      const updatedEntries = entries.map(e => 
-        e.id === id ? updatedEntry : e
-      );
-      localStorage.setItem('timeEntries', JSON.stringify(updatedEntries));
-      
+      // APIを使用して時間エントリーを更新
+      const updatedEntry = await timeEntryService.updateTimeEntry(id, entryData);
       dispatch({ type: 'UPDATE_ENTRY', payload: updatedEntry });
       return updatedEntry;
     } catch (error) {
@@ -260,16 +161,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
   // 時間記録削除
   const deleteTimeEntry = async (id: string) => {
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // ローカルストレージからエントリーを削除
-      const storedEntries = localStorage.getItem('timeEntries');
-      let entries: TimeEntry[] = storedEntries ? JSON.parse(storedEntries) : [];
-      const updatedEntries = entries.filter(e => e.id !== id);
-      localStorage.setItem('timeEntries', JSON.stringify(updatedEntries));
-      
+      // APIを使用して時間エントリーを削除
+      await timeEntryService.deleteTimeEntry(id);
       dispatch({ type: 'DELETE_ENTRY', payload: id });
     } catch (error) {
       throw new Error('Failed to delete time entry');
@@ -286,28 +179,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     }
     
     try {
-      const now = new Date();
-      const newEntry: TimeEntry = {
-        id: Date.now().toString(),
-        userId: user.id,
-        projectId,
-        taskId,
-        date: now.toISOString().split('T')[0],
-        startTime: now.toISOString(),
-        duration: 0,
-        notes: notes || '',
-        isBillable: true,
-        isRunning: true,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString()
-      };
-      
-      // ローカルストレージを更新
-      const storedEntries = localStorage.getItem('timeEntries');
-      let entries: TimeEntry[] = storedEntries ? JSON.parse(storedEntries) : [];
-      entries.push(newEntry);
-      localStorage.setItem('timeEntries', JSON.stringify(entries));
-      
+      // APIを使用してタイマーを開始
+      const newEntry = await timeEntryService.startTimer(projectId, taskId, notes);
       dispatch({ type: 'START_TIMER', payload: newEntry });
       return newEntry;
     } catch (error) {
@@ -320,29 +193,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     if (!state.activeEntry) return null;
     
     try {
-      const now = new Date();
-      const startTime = new Date(state.activeEntry.startTime || now);
-      const durationInHours = (now.getTime() - startTime.getTime()) / (1000 * 60 * 60);
-      
-      // 既存のdurationに追加（累積時間）
-      const totalDuration = state.activeEntry.duration + durationInHours;
-      
-      const updatedEntry: TimeEntry = {
-        ...state.activeEntry,
-        endTime: now.toISOString(),
-        duration: Math.round(totalDuration * 100) / 100, // 小数点2桁に丸める
-        isRunning: false,
-        updatedAt: now.toISOString()
-      };
-      
-      // ローカルストレージを更新
-      const storedEntries = localStorage.getItem('timeEntries');
-      let entries: TimeEntry[] = storedEntries ? JSON.parse(storedEntries) : [];
-      const updatedEntries = entries.map(e => 
-        e.id === updatedEntry.id ? updatedEntry : e
-      );
-      localStorage.setItem('timeEntries', JSON.stringify(updatedEntries));
-      
+      // APIを使用してタイマーを停止
+      const updatedEntry = await timeEntryService.stopTimer();
       dispatch({ type: 'STOP_TIMER', payload: updatedEntry });
       return updatedEntry;
     } catch (error) {

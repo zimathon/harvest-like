@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
-import { Project } from '../types';
+import * as projectService from '../services/projectService.js';
+import { Project } from '../types/index.js';
 
 // プロジェクト状態の型定義
 interface ProjectState {
@@ -90,166 +91,97 @@ const projectReducer = (state: ProjectState, action: ProjectAction): ProjectStat
   }
 };
 
-// モックデータの定義を削除またはコメントアウト
+// モックデータの定義を削除 (以前の修正でコメントアウト済みのはず)
 /*
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Website Redesign',
-    client: 'Acme Inc.',
-    description: 'Complete redesign of corporate website',
-    status: 'active',
-    budget: 10000,
-    budgetType: 'fixed',
-    createdAt: '2025-03-15T00:00:00Z',
-    updatedAt: '2025-04-01T00:00:00Z'
-  },
-  {
-    id: '2',
-    name: 'Mobile App Development',
-    client: 'TechCorp',
-    description: 'Develop iOS and Android applications',
-    status: 'active',
-    budget: 25000,
-    budgetType: 'fixed',
-    createdAt: '2025-02-10T00:00:00Z',
-    updatedAt: '2025-03-25T00:00:00Z'
-  },
-  {
-    id: '3',
-    name: 'Marketing Campaign',
-    client: 'Global Retail',
-    description: 'Q2 digital marketing campaign',
-    status: 'on hold',
-    budget: 5000,
-    budgetType: 'hourly',
-    hourlyRate: 150,
-    createdAt: '2025-04-01T00:00:00Z',
-    updatedAt: '2025-04-05T00:00:00Z'
-  }
-];
+const mockProjects: Project[] = [ ... ];
 */
 
 // プロバイダーコンポーネント
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(projectReducer, initialState);
 
-  // プロジェクト一覧取得
+  // プロジェクト一覧取得 (API呼び出しに変更)
   const fetchProjects = async () => {
     dispatch({ type: 'FETCH_PROJECTS_START' });
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // ローカルストレージからデータ取得を試みる
-      const storedProjects = localStorage.getItem('projects');
-      let projects: Project[] = [];
-
-      if (storedProjects) {
-         try {
-           projects = JSON.parse(storedProjects);
-         } catch (parseError) {
-             console.error("Error parsing projects from localStorage:", parseError);
-             localStorage.removeItem('projects'); // 破損データを削除
-             projects = [];
-         }
-      }
-
+      // --- APIを使用してプロジェクト一覧を取得 ---
+      const projects = await projectService.getProjects();
       dispatch({ type: 'FETCH_PROJECTS_SUCCESS', payload: projects });
+      // --- ローカルストレージとモックデータのロジックは削除 ---
+      /*
+      const storedProjects = localStorage.getItem('projects');
+      // ... (localStorage logic removed) ...
+      */
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch projects';
+      console.error("Error fetching projects:", error);
       dispatch({
         type: 'FETCH_PROJECTS_FAILURE',
-        payload: 'Failed to fetch projects. Please try again.'
+        // payload: 'Failed to fetch projects. Please try again.'
+        payload: message // より具体的なエラーメッセージをセット
       });
     }
   };
 
-  // プロジェクト追加
+  // プロジェクト追加 (エラーハンドリング改善)
   const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // optimistic update: 先にUIに反映 (任意)
+    // const tempId = Date.now().toString(); // 仮ID
+    // dispatch({ type: 'ADD_PROJECT', payload: { ...projectData, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } });
+
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const now = new Date().toISOString();
-      const newProject: Project = {
-        id: Date.now().toString(),
-        ...projectData,
-        createdAt: now,
-        updatedAt: now
-      };
-      
+      const newProject = await projectService.createProject(projectData);
+      // API成功後に正しいデータで状態を更新 (optimistic updateの場合は不要 or ID置換)
       dispatch({ type: 'ADD_PROJECT', payload: newProject });
-      
-      // ローカルストレージを更新
-      const storedProjects = localStorage.getItem('projects');
-      let projects: Project[] = storedProjects ? JSON.parse(storedProjects) : [];
-      projects.push(newProject);
-      localStorage.setItem('projects', JSON.stringify(projects));
-      
       return newProject;
     } catch (error) {
-      throw new Error('Failed to add project');
+      console.error("Error adding project:", error);
+      // optimistic update をしていた場合はロールバック処理が必要
+      // dispatch({ type: 'DELETE_PROJECT', payload: tempId }); // 例: 仮IDで追加したものを削除
+      const message = error instanceof Error ? error.message : 'Failed to add project';
+      throw new Error(message); // エラーを再スローして呼び出し元で処理できるようにする
     }
   };
 
-  // プロジェクト更新
+  // プロジェクト更新 (エラーハンドリング改善)
   const updateProject = async (id: string, projectData: Partial<Project>) => {
+    // const originalProject = state.projects.find(p => p.id === id); // optimistic update用
+    // if (originalProject) {
+    //   dispatch({ type: 'UPDATE_PROJECT', payload: { ...originalProject, ...projectData } });
+    // }
+
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // 既存プロジェクトを取得
-      const storedProjects = localStorage.getItem('projects');
-      let projects: Project[] = storedProjects ? JSON.parse(storedProjects) : [];
-      const existingProject = projects.find(p => p.id === id);
-      
-      if (!existingProject) {
-        throw new Error('Project not found');
-      }
-      
-      // プロジェクトを更新
-      const updatedProject: Project = {
-        ...existingProject,
-        ...projectData,
-        updatedAt: new Date().toISOString()
-      };
-      
-      // ローカルストレージを更新
-      const updatedProjects = projects.map(p => 
-        p.id === id ? updatedProject : p
-      );
-      localStorage.setItem('projects', JSON.stringify(updatedProjects));
-      
+      const updatedProject = await projectService.updateProject(id, projectData);
       dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
       return updatedProject;
     } catch (error) {
-      throw new Error('Failed to update project');
+      console.error("Error updating project:", error);
+      // if (originalProject) { // optimistic update のロールバック
+      //   dispatch({ type: 'UPDATE_PROJECT', payload: originalProject });
+      // }
+      const message = error instanceof Error ? error.message : 'Failed to update project';
+      throw new Error(message);
     }
   };
 
-  // プロジェクト削除
+  // プロジェクト削除 (エラーハンドリング改善)
   const deleteProject = async (id: string) => {
+    // const originalProjects = [...state.projects]; // optimistic update用
+    // dispatch({ type: 'DELETE_PROJECT', payload: id });
+
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // ローカルストレージからプロジェクトを削除
-      const storedProjects = localStorage.getItem('projects');
-      let projects: Project[] = storedProjects ? JSON.parse(storedProjects) : [];
-      const updatedProjects = projects.filter(p => p.id !== id);
-      localStorage.setItem('projects', JSON.stringify(updatedProjects));
-      
+      await projectService.deleteProject(id);
+      // API 成功後に state を更新 (optimistic update の場合は不要)
       dispatch({ type: 'DELETE_PROJECT', payload: id });
     } catch (error) {
-      throw new Error('Failed to delete project');
+      console.error("Error deleting project:", error);
+      // dispatch({ type: 'FETCH_PROJECTS_SUCCESS', payload: originalProjects }); // optimistic update のロールバック例
+      const message = error instanceof Error ? error.message : 'Failed to delete project';
+      throw new Error(message);
     }
   };
 
-  // プロジェクト選択
+  // プロジェクト選択 (変更なし)
   const selectProject = (project: Project | null) => {
     dispatch({ type: 'SELECT_PROJECT', payload: project });
   };
@@ -258,7 +190,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 依存配列を空にして初回のみ実行
+  }, []); // 初回のみ実行
 
   return (
     <ProjectContext.Provider

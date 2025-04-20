@@ -1,23 +1,28 @@
 import { ReactNode } from 'react';
-import { AuthProvider } from './AuthContext';
-import { ProjectProvider } from './ProjectContext';
-import { TimeEntryProvider } from './TimeEntryContext';
-import { ExpenseProvider } from './ExpenseContext';
+import { AuthProvider } from './AuthContext.js';
+import { ClientProvider } from './ClientContext.js';
+import { ExpenseProvider } from './ExpenseContext.js';
+import { ProjectProvider } from './ProjectContext.js';
+import { TimeEntryProvider } from './TimeEntryContext.js';
 
 interface AppProvidersProps {
   children: ReactNode;
 }
 
-export const AppProviders = ({ children }: AppProvidersProps) => {
+const AppProviders = ({ children }: AppProvidersProps) => {
   return (
     <AuthProvider>
       <ProjectProvider>
-        <TimeEntryProvider>
-          <ExpenseProvider>
-            {children}
-          </ExpenseProvider>
-        </TimeEntryProvider>
+        <ClientProvider>
+          <TimeEntryProvider>
+            <ExpenseProvider>
+              {children}
+            </ExpenseProvider>
+          </TimeEntryProvider>
+        </ClientProvider>
       </ProjectProvider>
     </AuthProvider>
   );
 };
+
+export default AppProviders;

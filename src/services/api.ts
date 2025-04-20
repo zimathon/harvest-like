@@ -1,10 +1,23 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+// 環境変数から API のベース URL を取得
+// Vite の場合:
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'; // フォールバックを追加
+
+// Create React App の場合:
+// const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
+
+// 環境変数が設定されていない場合の警告
+if (!import.meta.env.VITE_API_BASE_URL && process.env.NODE_ENV !== 'production') {
+  console.warn(
+    'Warning: VITE_API_BASE_URL environment variable is not set. Using default:',
+    API_URL
+  );
+}
 
 // Create axios instance
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: API_URL, // 環境変数から取得した URL を使用
   headers: {
     'Content-Type': 'application/json'
   }

@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import { Expense } from '../types';
 import { useAuth } from './AuthContext.js';
+import * as expenseService from '../services/expenseService';
 
 // 経費状態の型定義
 interface ExpenseState {
@@ -76,49 +77,6 @@ const expenseReducer = (state: ExpenseState, action: ExpenseAction): ExpenseStat
   }
 };
 
-// モックデータの定義を削除またはコメントアウト
-/*
-const mockExpenses: Expense[] = [
-  {
-    id: '1',
-    userId: '1',
-    projectId: '1',
-    category: 'Meals & Entertainment',
-    date: '2025-04-15',
-    amount: 65.00,
-    description: 'Client lunch meeting',
-    notes: 'Discussed website requirements with client',
-    status: 'approved',
-    createdAt: '2025-04-15T14:30:00Z',
-    updatedAt: '2025-04-16T09:15:00Z'
-  },
-  {
-    id: '2',
-    userId: '1',
-    projectId: '2',
-    category: 'Software',
-    date: '2025-04-10',
-    amount: 49.99,
-    description: 'Software subscription',
-    status: 'pending',
-    createdAt: '2025-04-10T10:00:00Z',
-    updatedAt: '2025-04-10T10:00:00Z'
-  },
-  {
-    id: '3',
-    userId: '1',
-    projectId: 'general',
-    category: 'Office Supplies',
-    date: '2025-04-05',
-    amount: 32.50,
-    description: 'Office supplies',
-    status: 'approved',
-    createdAt: '2025-04-05T16:45:00Z',
-    updatedAt: '2025-04-06T11:20:00Z'
-  }
-];
-*/
-
 // プロバイダーコンポーネント
 export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(expenseReducer, initialState);
@@ -130,27 +88,8 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
 
     dispatch({ type: 'FETCH_EXPENSES_START' });
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理 (将来的にはAPI呼び出しに置き換える)
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // ローカルストレージからデータ取得を試みる
-      const storedExpenses = localStorage.getItem('expenses');
-      let expenses: Expense[] = [];
-
-      if (storedExpenses) {
-        try {
-          expenses = JSON.parse(storedExpenses);
-          // 現在のユーザーの経費のみをフィルタリング
-          expenses = expenses.filter(expense => expense.userId === user.id);
-        } catch (parseError) {
-           console.error("Error parsing expenses from localStorage:", parseError);
-           // Optionally clear corrupted data
-           localStorage.removeItem('expenses');
-           expenses = [];
-        }
-      }
-
+      // APIを使用して経費一覧を取得
+      const expenses = await expenseService.getMyExpenses();
       dispatch({ type: 'FETCH_EXPENSES_SUCCESS', payload: expenses });
     } catch (error) {
       dispatch({
@@ -165,27 +104,9 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
     if (!user) throw new Error('User not authenticated');
     
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const now = new Date().toISOString();
-      const newExpense: Expense = {
-        id: Date.now().toString(),
-        ...expenseData,
-        userId: user.id,
-        createdAt: now,
-        updatedAt: now
-      };
-      
+      // APIを使用して経費を追加
+      const newExpense = await expenseService.createExpense(expenseData);
       dispatch({ type: 'ADD_EXPENSE', payload: newExpense });
-      
-      // ローカルストレージを更新
-      const storedExpenses = localStorage.getItem('expenses');
-      let expenses: Expense[] = storedExpenses ? JSON.parse(storedExpenses) : [];
-      expenses.push(newExpense);
-      localStorage.setItem('expenses', JSON.stringify(expenses));
-      
       return newExpense;
     } catch (error) {
       throw new Error('Failed to add expense');
@@ -195,32 +116,8 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
   // 経費更新
   const updateExpense = async (id: string, expenseData: Partial<Expense>) => {
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // 既存の経費を取得
-      const storedExpenses = localStorage.getItem('expenses');
-      let expenses: Expense[] = storedExpenses ? JSON.parse(storedExpenses) : [];
-      const existingExpense = expenses.find(e => e.id === id);
-      
-      if (!existingExpense) {
-        throw new Error('Expense not found');
-      }
-      
-      // 経費を更新
-      const updatedExpense: Expense = {
-        ...existingExpense,
-        ...expenseData,
-        updatedAt: new Date().toISOString()
-      };
-      
-      // ローカルストレージを更新
-      const updatedExpenses = expenses.map(e => 
-        e.id === id ? updatedExpense : e
-      );
-      localStorage.setItem('expenses', JSON.stringify(updatedExpenses));
-      
+      // APIを使用して経費を更新
+      const updatedExpense = await expenseService.updateExpense(id, expenseData);
       dispatch({ type: 'UPDATE_EXPENSE', payload: updatedExpense });
       return updatedExpense;
     } catch (error) {
@@ -231,16 +128,8 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
   // 経費削除
   const deleteExpense = async (id: string) => {
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // ローカルストレージから経費を削除
-      const storedExpenses = localStorage.getItem('expenses');
-      let expenses: Expense[] = storedExpenses ? JSON.parse(storedExpenses) : [];
-      const updatedExpenses = expenses.filter(e => e.id !== id);
-      localStorage.setItem('expenses', JSON.stringify(updatedExpenses));
-      
+      // APIを使用して経費を削除
+      await expenseService.deleteExpense(id);
       dispatch({ type: 'DELETE_EXPENSE', payload: id });
     } catch (error) {
       throw new Error('Failed to delete expense');

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
 import { User } from '../types';
+import * as authService from '../services/authService';
 
 // 認証状態の型定義
 interface AuthState {
@@ -28,7 +29,7 @@ type AuthAction =
 // コンテキストの型定義
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
 
@@ -78,18 +79,20 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // ローカルストレージからユーザー情報を取得
+  // ローカルストレージからトークンを取得し、ユーザー情報を読み込む
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
+        const token = localStorage.getItem('token');
+        if (token) {
+          // トークンがある場合、現在のユーザー情報を取得
+          const user = await authService.getCurrentUser();
           dispatch({ type: 'LOGIN_SUCCESS', payload: user });
         } else {
           dispatch({ type: 'LOGOUT' });
         }
       } catch (error) {
+        localStorage.removeItem('token');
         dispatch({ type: 'LOGOUT' });
       }
     };
@@ -101,35 +104,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     dispatch({ type: 'LOADING' });
     try {
-      // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // APIを使用してログイン
+      const { token, user } = await authService.login(email, password);
       
-      // モックユーザーデータ
-      const user: User = {
-        id: '1',
-        name: 'Demo User',
-        email: email,
-        role: 'admin',
-        createdAt: new Date().toISOString()
-      };
-      
-      localStorage.setItem('user', JSON.stringify(user));
+      // トークンとユーザー情報を保存
+      localStorage.setItem('token', token);
       dispatch({ type: 'LOGIN_SUCCESS', payload: user });
     } catch (error) {
       dispatch({ type: 'LOGIN_FAILURE', payload: 'Login failed. Please check your credentials.' });
+      throw error;
     }
   };
 
   // ログアウト処理
-  const logout = () => {
-    localStorage.removeItem('user');
-    dispatch({ type: 'LOGOUT' });
+  const logout = async () => {
+    try {
+      // APIを使用してログアウト
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // ローカルストレージからトークンを削除
+      localStorage.removeItem('token');
+      dispatch({ type: 'LOGOUT' });
+    }
   };
 
   // ユーザー情報更新
   const updateUser = (user: User) => {
-    localStorage.setItem('user', JSON.stringify(user));
     dispatch({ type: 'UPDATE_USER', payload: user });
   };
 
