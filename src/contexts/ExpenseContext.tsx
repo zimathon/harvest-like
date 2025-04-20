@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import { Expense } from '../types';
-import { useAuth } from './AuthContext';
+import { useAuth } from './AuthContext.js';
 
 // 経費状態の型定義
 interface ExpenseState {
@@ -76,7 +76,8 @@ const expenseReducer = (state: ExpenseState, action: ExpenseAction): ExpenseStat
   }
 };
 
-// モックデータ
+// モックデータの定義を削除またはコメントアウト
+/*
 const mockExpenses: Expense[] = [
   {
     id: '1',
@@ -116,6 +117,7 @@ const mockExpenses: Expense[] = [
     updatedAt: '2025-04-06T11:20:00Z'
   }
 ];
+*/
 
 // プロバイダーコンポーネント
 export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
@@ -125,32 +127,35 @@ export const ExpenseProvider = ({ children }: { children: ReactNode }) => {
   // 経費一覧取得
   const fetchExpenses = async () => {
     if (!user) return;
-    
+
     dispatch({ type: 'FETCH_EXPENSES_START' });
     try {
       // 実際のアプリケーションではAPIリクエストを行う
-      // ここではモック処理
+      // ここではモック処理 (将来的にはAPI呼び出しに置き換える)
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // ローカルストレージからデータ取得を試みる
       const storedExpenses = localStorage.getItem('expenses');
       let expenses: Expense[] = [];
-      
+
       if (storedExpenses) {
-        expenses = JSON.parse(storedExpenses);
-        // 現在のユーザーの経費のみをフィルタリング
-        expenses = expenses.filter(expense => expense.userId === user.id);
-      } else {
-        // 初回はモックデータを使用
-        expenses = mockExpenses;
-        localStorage.setItem('expenses', JSON.stringify(expenses));
+        try {
+          expenses = JSON.parse(storedExpenses);
+          // 現在のユーザーの経費のみをフィルタリング
+          expenses = expenses.filter(expense => expense.userId === user.id);
+        } catch (parseError) {
+           console.error("Error parsing expenses from localStorage:", parseError);
+           // Optionally clear corrupted data
+           localStorage.removeItem('expenses');
+           expenses = [];
+        }
       }
-      
+
       dispatch({ type: 'FETCH_EXPENSES_SUCCESS', payload: expenses });
     } catch (error) {
-      dispatch({ 
-        type: 'FETCH_EXPENSES_FAILURE', 
-        payload: 'Failed to fetch expenses. Please try again.' 
+      dispatch({
+        type: 'FETCH_EXPENSES_FAILURE',
+        payload: 'Failed to fetch expenses. Please try again.'
       });
     }
   };

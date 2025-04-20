@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
+import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import { Project } from '../types';
 
 // プロジェクト状態の型定義
@@ -90,7 +90,8 @@ const projectReducer = (state: ProjectState, action: ProjectAction): ProjectStat
   }
 };
 
-// モックデータ
+// モックデータの定義を削除またはコメントアウト
+/*
 const mockProjects: Project[] = [
   {
     id: '1',
@@ -127,6 +128,7 @@ const mockProjects: Project[] = [
     updatedAt: '2025-04-05T00:00:00Z'
   }
 ];
+*/
 
 // プロバイダーコンポーネント
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
@@ -139,24 +141,26 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       // 実際のアプリケーションではAPIリクエストを行う
       // ここではモック処理
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // ローカルストレージからデータ取得を試みる
       const storedProjects = localStorage.getItem('projects');
       let projects: Project[] = [];
-      
+
       if (storedProjects) {
-        projects = JSON.parse(storedProjects);
-      } else {
-        // 初回はモックデータを使用
-        projects = mockProjects;
-        localStorage.setItem('projects', JSON.stringify(projects));
+         try {
+           projects = JSON.parse(storedProjects);
+         } catch (parseError) {
+             console.error("Error parsing projects from localStorage:", parseError);
+             localStorage.removeItem('projects'); // 破損データを削除
+             projects = [];
+         }
       }
-      
+
       dispatch({ type: 'FETCH_PROJECTS_SUCCESS', payload: projects });
     } catch (error) {
-      dispatch({ 
-        type: 'FETCH_PROJECTS_FAILURE', 
-        payload: 'Failed to fetch projects. Please try again.' 
+      dispatch({
+        type: 'FETCH_PROJECTS_FAILURE',
+        payload: 'Failed to fetch projects. Please try again.'
       });
     }
   };
@@ -253,7 +257,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   // 初回マウント時にプロジェクト一覧を取得
   useEffect(() => {
     fetchProjects();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 依存配列を空にして初回のみ実行
 
   return (
     <ProjectContext.Provider
@@ -275,7 +280,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 export const useProjects = () => {
   const context = useContext(ProjectContext);
   if (context === undefined) {
-    throw new Error('useProjects must be used within a ProjectProvider');
+    throw new Error('useProjects must be used within an ProjectProvider');
   }
   return context;
 };
