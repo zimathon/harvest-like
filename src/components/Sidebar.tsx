@@ -1,16 +1,17 @@
-import { Box, VStack, Text, Flex, Icon, Button, Divider, Avatar } from '@chakra-ui/react'
-import { NavLink as RouterLink, useNavigate } from 'react-router-dom'
-import { 
-  MdTimer, 
-  MdAttachMoney, 
-  MdFolderOpen, 
-  MdPeople, 
-  MdBarChart, 
-  MdReceipt, 
-  MdSettings,
+import { Avatar, Box, Button, Divider, Flex, Icon, Text, VStack } from '@chakra-ui/react'
+import {
+  MdAttachMoney,
+  MdBarChart,
+  MdBusiness,
+  MdDashboard,
+  MdFolderOpen,
   MdLogout,
-  MdDashboard
+  MdPeople,
+  MdReceipt,
+  MdSettings,
+  MdTimer
 } from 'react-icons/md'
+import { NavLink as RouterLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { name: 'Time', path: '/time', icon: MdTimer },
   { name: 'Expenses', path: '/expenses', icon: MdAttachMoney },
   { name: 'Projects', path: '/projects', icon: MdFolderOpen },
+  { name: 'Clients', path: '/clients', icon: MdBusiness },
   { name: 'Team', path: '/team', icon: MdPeople },
   { name: 'Reports', path: '/reports', icon: MdBarChart },
   { name: 'Invoices', path: '/invoices', icon: MdReceipt },

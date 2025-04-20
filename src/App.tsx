@@ -1,16 +1,17 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Box } from '@chakra-ui/react'
+import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import TimeTracking from './pages/TimeTracking'
-import Projects from './pages/Projects'
-import Team from './pages/Team'
-import Reports from './pages/Reports'
-import Invoices from './pages/Invoices'
-import Expenses from './pages/Expenses'
-import Manage from './pages/Manage'
-import Login from './pages/Login'
 import { useAuth } from './contexts/AuthContext'
+import Clients from './pages/Clients'
+import Dashboard from './pages/Dashboard'
+import Expenses from './pages/Expenses'
+import Invoices from './pages/Invoices'
+import Login from './pages/Login'
+import Manage from './pages/Manage'
+import Projects from './pages/Projects'
+import Reports from './pages/Reports'
+import Team from './pages/Team'
+import TimeTracking from './pages/TimeTracking'
 
 // 認証が必要なルートのラッパーコンポーネント
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
@@ -96,6 +97,14 @@ function App() {
             <PrivateRoute>
               <Layout>
                 <Manage />
+              </Layout>
+            </PrivateRoute>
+          } />
+          
+          <Route path="/clients" element={
+            <PrivateRoute>
+              <Layout>
+                <Clients />
               </Layout>
             </PrivateRoute>
           } />
