@@ -12,19 +12,20 @@ export interface User {
 export interface Project {
   id: string;
   name: string;
-  client: string;
+  client: Client;
   description?: string;
   status: 'active' | 'completed' | 'archived' | 'on hold';
   budget?: number;
   budgetType?: 'hourly' | 'fixed';
   hourlyRate?: number;
+  tasks?: Task[];
   createdAt: string;
   updatedAt: string;
 }
 
 // タスク関連の型定義
 export interface Task {
-  id: string;
+  id?: string; // Add id property
   name: string;
   defaultRate?: number;
   isBillable: boolean;
@@ -46,8 +47,8 @@ export interface Client {
 export interface TimeEntry {
   id: string;
   userId: string;
-  projectId: string;
-  taskId: string;
+  project: Project;
+  task: Task;
   date: string;
   startTime?: string;
   endTime?: string;
@@ -63,7 +64,7 @@ export interface TimeEntry {
 export interface Expense {
   id: string;
   userId: string;
-  projectId: string;
+  project: Project;
   category: string;
   date: string;
   amount: number;

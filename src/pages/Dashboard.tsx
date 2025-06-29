@@ -89,18 +89,21 @@ const Dashboard = () => {
       .slice(0, 5);
   }, [timeEntries]);
   
-  // プロジェクト名を取得
-  const getProjectName = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    return project ? project.name : 'Unknown Project';
-  };
+  // 最近の経費（最新5件）
+  const recentExpenses = useMemo(() => {
+    return [...expenses]
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 5);
+  }, [expenses]);
+  
+  
   
   // プロジェクトの進捗状況
   const projectProgress = useMemo(() => {
     return projects.map(project => {
       // プロジェクトの時間を集計
       const projectHours = timeEntries
-        .filter(entry => entry.projectId === project.id)
+        .filter(entry => entry.project.id === project.id)
         .reduce((total, entry) => total + entry.duration, 0);
       
       // 予算に対する進捗率を計算（仮定として、予算が時間または金額で設定されているものとする）
@@ -230,7 +233,7 @@ const Dashboard = () => {
                   {recentTimeEntries.map(entry => (
                     <Tr key={entry.id}>
                       <Td>{formatDate(entry.date)}</Td>
-                      <Td>{getProjectName(entry.projectId)}</Td>
+                      <Td>{entry.project.name}</Td>
                       <Td>{formatHours(entry.duration)}</Td>
                       <Td>
                         {entry.isRunning ? (
@@ -274,6 +277,36 @@ const Dashboard = () => {
               </VStack>
             ) : (
               <Text>No active projects</Text>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <Heading size="md" mb={4}>Recent Expenses</Heading>
+            {recentExpenses.length > 0 ? (
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th>Date</Th>
+                    <Th>Category</Th>
+                    <Th>Amount</Th>
+                    <Th>Project</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {recentExpenses.map(expense => (
+                    <Tr key={expense.id}>
+                      <Td>{formatDate(expense.date)}</Td>
+                      <Td>{expense.category}</Td>
+                      <Td>{formatAmount(expense.amount)}</Td>
+                      <Td>{expense.project.name}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            ) : (
+              <Text>No expenses yet</Text>
             )}
           </CardBody>
         </Card>

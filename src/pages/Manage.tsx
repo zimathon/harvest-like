@@ -24,8 +24,7 @@ import {
   Select,
   Textarea,
   Switch,
-  Badge,
-  Icon
+  Badge
 } from '@chakra-ui/react'
 import { MdEditNote, MdDelete, MdAdd } from 'react-icons/md'
 

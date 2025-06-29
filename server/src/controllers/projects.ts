@@ -1,12 +1,13 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import Project from '../models/Project.js';
+import { AuthRequest } from '../types/index.js';
 
 // @desc    Get all projects
 // @route   GET /api/projects
 // @access  Private
-export const getProjects = async (req: Request, res: Response): Promise<void> => {
+export const getProjects = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const projects = await Project.find().populate('client', 'name');
+    const projects = await Project.find({ user: req.user?.id }).populate('client', 'name');
 
     res.status(200).json({
       success: true,
@@ -24,7 +25,7 @@ export const getProjects = async (req: Request, res: Response): Promise<void> =>
 // @desc    Get single project
 // @route   GET /api/projects/:id
 // @access  Private
-export const getProject = async (req: Request, res: Response): Promise<void> => {
+export const getProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const project = await Project.findById(req.params.id)
       .populate('client', 'name')
@@ -34,6 +35,15 @@ export const getProject = async (req: Request, res: Response): Promise<void> => 
       res.status(404).json({
         success: false,
         error: 'Project not found'
+      });
+      return;
+    }
+
+    // Make sure user owns project
+    if (project.user.toString() !== req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: `User ${req.user?.id} is not authorized to view this project`
       });
       return;
     }
@@ -53,8 +63,11 @@ export const getProject = async (req: Request, res: Response): Promise<void> => 
 // @desc    Create new project
 // @route   POST /api/projects
 // @access  Private
-export const createProject = async (req: Request, res: Response): Promise<void> => {
+export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Add user to req.body
+    req.body.user = req.user?.id;
+
     const project = await Project.create(req.body);
 
     res.status(201).json({
@@ -72,12 +85,9 @@ export const createProject = async (req: Request, res: Response): Promise<void> 
 // @desc    Update project
 // @route   PUT /api/projects/:id
 // @access  Private
-export const updateProject = async (req: Request, res: Response): Promise<void> => {
+export const updateProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const project = await Project.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    let project = await Project.findById(req.params.id);
 
     if (!project) {
       res.status(404).json({
@@ -86,6 +96,20 @@ export const updateProject = async (req: Request, res: Response): Promise<void> 
       });
       return;
     }
+
+    // Make sure user owns project
+    if (project.user.toString() !== req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: `User ${req.user?.id} is not authorized to update this project`
+      });
+      return;
+    }
+
+    project = await Project.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true
+    });
 
     res.status(200).json({
       success: true,
@@ -102,7 +126,7 @@ export const updateProject = async (req: Request, res: Response): Promise<void> 
 // @desc    Delete project
 // @route   DELETE /api/projects/:id
 // @access  Private
-export const deleteProject = async (req: Request, res: Response): Promise<void> => {
+export const deleteProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -110,6 +134,15 @@ export const deleteProject = async (req: Request, res: Response): Promise<void> 
       res.status(404).json({
         success: false,
         error: 'Project not found'
+      });
+      return;
+    }
+
+    // Make sure user owns project
+    if (project.user.toString() !== req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: `User ${req.user?.id} is not authorized to delete this project`
       });
       return;
     }
@@ -131,7 +164,7 @@ export const deleteProject = async (req: Request, res: Response): Promise<void> 
 // @desc    Add member to project
 // @route   POST /api/projects/:id/members
 // @access  Private
-export const addProjectMember = async (req: Request, res: Response): Promise<void> => {
+export const addProjectMember = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { user, role } = req.body;
     
@@ -141,6 +174,15 @@ export const addProjectMember = async (req: Request, res: Response): Promise<voi
       res.status(404).json({
         success: false,
         error: 'Project not found'
+      });
+      return;
+    }
+
+    // Make sure user owns project
+    if (project.user.toString() !== req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: `User ${req.user?.id} is not authorized to add members to this project`
       });
       return;
     }
@@ -177,7 +219,7 @@ export const addProjectMember = async (req: Request, res: Response): Promise<voi
 // @desc    Remove member from project
 // @route   DELETE /api/projects/:id/members/:userId
 // @access  Private
-export const removeProjectMember = async (req: Request, res: Response): Promise<void> => {
+export const removeProjectMember = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const project = await Project.findById(req.params.id);
 
@@ -185,6 +227,15 @@ export const removeProjectMember = async (req: Request, res: Response): Promise<
       res.status(404).json({
         success: false,
         error: 'Project not found'
+      });
+      return;
+    }
+
+    // Make sure user owns project
+    if (project.user.toString() !== req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: `User ${req.user?.id} is not authorized to remove members from this project`
       });
       return;
     }

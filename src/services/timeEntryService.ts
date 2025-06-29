@@ -31,8 +31,8 @@ export const getTimeEntryById = async (id: string): Promise<TimeEntry> => {
 // Create time entry
 export const createTimeEntry = async (entryData: Omit<TimeEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<TimeEntry> => {
   const response = await api.post('/time-entries', {
-    project: entryData.projectId,
-    task: entryData.taskId,
+    project: entryData.project.id,
+    task: entryData.task.id,
     date: entryData.date,
     duration: entryData.duration,
     notes: entryData.notes,
@@ -44,8 +44,8 @@ export const createTimeEntry = async (entryData: Omit<TimeEntry, 'id' | 'userId'
 // Update time entry
 export const updateTimeEntry = async (id: string, entryData: Partial<TimeEntry>): Promise<TimeEntry> => {
   const response = await api.put(`/time-entries/${id}`, {
-    project: entryData.projectId,
-    task: entryData.taskId,
+    project: entryData.project?.id,
+    task: entryData.task?.id,
     date: entryData.date,
     duration: entryData.duration,
     notes: entryData.notes,

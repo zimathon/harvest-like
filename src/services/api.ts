@@ -8,7 +8,7 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'
 // const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001/api';
 
 // 環境変数が設定されていない場合の警告
-if (!import.meta.env.VITE_API_BASE_URL && process.env.NODE_ENV !== 'production') {
+if (!import.meta.env.VITE_API_BASE_URL && import.meta.env.MODE !== 'production') {
   console.warn(
     'Warning: VITE_API_BASE_URL environment variable is not set. Using default:',
     API_URL

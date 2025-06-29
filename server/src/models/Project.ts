@@ -1,5 +1,17 @@
-import mongoose, { Schema } from 'mongoose';
-import { ProjectDocument } from '../types/index.js';
+import mongoose, { Schema, Document, Types } from 'mongoose';
+
+export interface ProjectDocument extends Document {
+  name: string;
+  client: Types.ObjectId;
+  description?: string;
+  status: 'active' | 'completed' | 'archived' | 'on hold';
+  budget?: number;
+  budgetType: 'hourly' | 'fixed';
+  hourlyRate?: number;
+  members: Array<{ user: Types.ObjectId; role: string }>;
+  tasks: Array<{ name: string; hourlyRate?: number; isBillable: boolean }>;
+  user: Types.ObjectId; // Reference to the User who created this project
+}
 
 const ProjectSchema = new Schema<ProjectDocument>(
   {
@@ -56,7 +68,12 @@ const ProjectSchema = new Schema<ProjectDocument>(
           default: true
         }
       }
-    ]
+    ],
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
   },
   {
     timestamps: true

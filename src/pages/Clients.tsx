@@ -27,7 +27,7 @@ import {
 } from '@chakra-ui/react';
 import { useState } from 'react'; // Reactをインポート
 import { MdAdd, MdDelete, MdEdit, MdMoreVert, MdSearch } from 'react-icons/md';
-import ClientModal from '../components/ClientModal.js'; // ClientModalをインポート (後で作成)
+import ClientModal from '../components/ClientModal';
 import { useClients } from '../contexts/ClientContext.js';
 import { Client } from '../types/index.js';
 

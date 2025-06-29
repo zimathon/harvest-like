@@ -1,5 +1,14 @@
-import mongoose, { Schema } from 'mongoose';
-import { ClientDocument } from '../types/index.js';
+import mongoose, { Schema, Document, Types } from 'mongoose';
+
+export interface ClientDocument extends Document {
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  status: 'active' | 'inactive';
+  user: Types.ObjectId; // Reference to the User who created this client
+}
 
 const ClientSchema = new Schema<ClientDocument>(
   {
@@ -31,7 +40,12 @@ const ClientSchema = new Schema<ClientDocument>(
       type: String,
       enum: ['active', 'inactive'],
       default: 'active'
-    }
+    },
+    user: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
   },
   {
     timestamps: true

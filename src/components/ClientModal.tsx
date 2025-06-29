@@ -1,45 +1,41 @@
 import {
-    Box,
-    Button,
-    FormControl,
-    FormLabel,
-    Input,
-    Modal,
-    ModalBody,
-    ModalCloseButton,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    ModalOverlay,
-    Select,
-    Textarea,
-    useToast, // Toast をインポート
-    VStack,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  VStack,
+  useToast,
+  Select,
 } from '@chakra-ui/react';
-import React, { useEffect, useState } from 'react'; // React をインポート
-import { useClients } from '../contexts/ClientContext.js';
-import { Client } from '../types/index.js';
+import { useEffect, useState } from 'react';
+import { useClients } from '../contexts/ClientContext';
+import { Client } from '../types';
 
 interface ClientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  clientToEdit: Client | null; // 編集対象のクライアント (nullなら新規作成)
+  clientToEdit: Client | null;
 }
 
 const ClientModal = ({ isOpen, onClose, clientToEdit }: ClientModalProps) => {
-  const { addClient, updateClient } = useClients();
-  const toast = useToast(); // 通知用
-
-  // Form state
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // 編集モードの場合、フォームに初期値をセット
+  const { addClient, updateClient } = useClients();
+  const toast = useToast();
+
   useEffect(() => {
     if (clientToEdit) {
       setName(clientToEdit.name);
@@ -49,7 +45,7 @@ const ClientModal = ({ isOpen, onClose, clientToEdit }: ClientModalProps) => {
       setAddress(clientToEdit.address || '');
       setStatus(clientToEdit.status);
     } else {
-      // 新規作成モードの場合はフォームをリセット
+      // Reset form for new client
       setName('');
       setContactName('');
       setEmail('');
@@ -57,125 +53,87 @@ const ClientModal = ({ isOpen, onClose, clientToEdit }: ClientModalProps) => {
       setAddress('');
       setStatus('active');
     }
-  }, [clientToEdit, isOpen]); // isOpen も依存配列に追加し、モーダルが開くたびに初期化
+  }, [clientToEdit, isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name) {
-      toast({ title: "Client name is required.", status: "warning", duration: 3000, isClosable: true });
-      return;
-    }
-    setIsSubmitting(true);
-
-    const clientData = {
-      name,
-      contactName: contactName || undefined, // 空文字は undefined に
-      email: email || undefined,
-      phone: phone || undefined,
-      address: address || undefined,
-      status,
-    };
-
+  const handleSubmit = async () => {
+    setIsLoading(true);
     try {
+      const clientData = { name, contactName, email, phone, address, status };
       if (clientToEdit) {
-        // 更新処理
         await updateClient(clientToEdit.id, clientData);
-        toast({ title: "Client updated successfully.", status: "success" });
+        toast({
+          title: 'Client updated.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
       } else {
-        // 新規作成処理
         await addClient(clientData);
-        toast({ title: "Client added successfully.", status: "success" });
+        toast({
+          title: 'Client created.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
       }
-      onClose(); // モーダルを閉じる
+      onClose();
     } catch (error) {
-      console.error("Failed to save client:", error);
       toast({
-        title: `Error ${clientToEdit ? 'updating' : 'adding'} client.`,
-        description: error instanceof Error ? error.message : "Could not save client.",
-        status: "error",
+        title: 'Error saving client.',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose}>
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>{clientToEdit ? 'Edit Client' : 'Add New Client'}</ModalHeader>
+        <ModalHeader>{clientToEdit ? 'Edit Client' : 'Create New Client'}</ModalHeader>
         <ModalCloseButton />
-        <ModalBody pb={6}>
-          <Box as="form" id="client-form" onSubmit={handleSubmit}>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>Client Name</FormLabel>
-                <Input
-                  placeholder="Enter client name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Contact Name</FormLabel>
-                <Input
-                  placeholder="Contact person (optional)"
-                  value={contactName}
-                  onChange={(e) => setContactName(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Email</FormLabel>
-                <Input
-                  type="email"
-                  placeholder="client@example.com (optional)"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Phone</FormLabel>
-                <Input
-                  placeholder="Phone number (optional)"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Address</FormLabel>
-                <Textarea
-                  placeholder="Client address (optional)"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Status</FormLabel>
-                <Select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </Select>
-              </FormControl>
-            </VStack>
-          </Box>
+        <ModalBody>
+          <VStack spacing={4}>
+            <FormControl isRequired>
+              <FormLabel>Client Name</FormLabel>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Contact Name</FormLabel>
+              <Input value={contactName} onChange={(e) => setContactName(e.target.value)} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Email</FormLabel>
+              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Phone</FormLabel>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Address</FormLabel>
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Status</FormLabel>
+              <Select value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </Select>
+            </FormControl>
+          </VStack>
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose} isDisabled={isSubmitting}>
+          <Button variant="ghost" onClick={onClose} mr={3}>
             Cancel
           </Button>
-          <Button
-            colorScheme="blue"
-            type="submit" // form の submit をトリガー
-            form="client-form" // フォームとボタンを関連付け
-            isLoading={isSubmitting}
-          >
-            {clientToEdit ? 'Save Changes' : 'Add Client'}
+          <Button colorScheme="blue" onClick={handleSubmit} isLoading={isLoading}>
+            {clientToEdit ? 'Update' : 'Create'}
           </Button>
         </ModalFooter>
       </ModalContent>
@@ -183,4 +141,4 @@ const ClientModal = ({ isOpen, onClose, clientToEdit }: ClientModalProps) => {
   );
 };
 
-export default ClientModal; 
+export default ClientModal;

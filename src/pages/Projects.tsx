@@ -32,9 +32,10 @@ import {
   Thead,
   Tr,
   useDisclosure,
-  VStack
+  useToast, // Toastを追加
+  VStack // VStackを追加
 } from '@chakra-ui/react'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react' // useEffectを追加
 import { MdAdd, MdArchive, MdEdit, MdSearch } from 'react-icons/md'
 import { useClients } from '../contexts/ClientContext.js'
 import { useProjects } from '../contexts/ProjectContext.js'
@@ -43,23 +44,38 @@ import { Project } from '../types/index.js'
 type ProjectStatus = Project['status']
 
 const Projects = () => {
-  const { projects, isLoading, error, fetchProjects, deleteProject, addProject } = useProjects()
+  const { projects, isLoading, error, updateProject, addProject } = useProjects()
   const { clients: clientList, isLoading: clientsLoading } = useClients()
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null) // 編集用プロジェクト
+  const toast = useToast() // Toastを追加
 
   const filteredProjects = projects.filter(project =>
     project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.client?.toLowerCase().includes(searchTerm.toLowerCase())
+                project.client.name.toLowerCase().includes(searchTerm.toLowerCase()) // client.nameで検索 // client.nameで検索
   )
 
   const handleArchive = async (id: string) => {
-    if (window.confirm('Are you sure you want to archive this project? (This will delete it)')) {
+    if (window.confirm('Are you sure you want to archive this project?')) {
       try {
-        await deleteProject(id)
+        await updateProject(id, { status: 'archived' }) // statusをarchivedに更新
+        toast({
+          title: "Project archived.",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
       } catch (err) {
         console.error("Failed to archive project:", err)
+        toast({
+          title: "Error archiving project.",
+          description: err instanceof Error ? err.message : "Could not archive project.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
       }
     }
   }
@@ -74,10 +90,52 @@ const Projects = () => {
   const [hourlyRate, setHourlyRate] = useState<number | string>('')
   // --- Project Form State End ---
 
+  // モーダル開閉時の初期化/設定
+  useEffect(() => {
+    if (isOpen) {
+      if (selectedProject) {
+        setProjectName(selectedProject.name)
+        setClientId(selectedProject.client.id) // client.idを使用
+        setDescription(selectedProject.description || '')
+        setStatus(selectedProject.status)
+        setBudget(selectedProject.budget || '')
+        setBudgetType(selectedProject.budgetType || 'hourly')
+        setHourlyRate(selectedProject.hourlyRate || '')
+      } else {
+        // 新規作成時はフォームをリセット
+        setProjectName('')
+        setClientId('')
+        setDescription('')
+        setStatus('active')
+        setBudget('')
+        setBudgetType('hourly')
+        setHourlyRate('')
+      }
+    }
+  }, [isOpen, selectedProject])
+
+  // 新規作成モーダルを開く
+  const handleOpenNewModal = () => {
+    setSelectedProject(null) // 編集対象をリセット
+    onOpen()
+  }
+
+  // 編集モーダルを開く
+  const handleOpenEditModal = (project: Project) => {
+    setSelectedProject(project) // 編集対象をセット
+    onOpen()
+  }
+
   // --- Save Project Logic ---
   const handleSaveProject = async () => {
     if (!projectName || !clientId) {
-      alert('Please fill in Project Name and Client.')
+      toast({
+        title: 'Validation Error',
+        description: 'Please fill in Project Name and Client.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
       return
     }
     setIsSubmitting(true)
@@ -85,26 +143,55 @@ const Projects = () => {
       const budgetNumber = typeof budget === 'string' ? parseFloat(budget) : budget || 0
       const rateNumber = typeof hourlyRate === 'string' ? parseFloat(hourlyRate) : hourlyRate || 0
 
-      await addProject({
+      const selectedClient = clientList.find(c => c.id === clientId);
+      if (!selectedClient) {
+        toast({
+          title: 'Validation Error',
+          description: 'Selected client not found.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      const projectData = {
         name: projectName,
-        client: clientId,
+        client: selectedClient, // Clientオブジェクトを渡す
         description,
         status,
         budget: isNaN(budgetNumber) ? 0 : budgetNumber,
         budgetType,
         hourlyRate: isNaN(rateNumber) ? 0 : rateNumber,
-      })
+      }
+
+      if (selectedProject) {
+        await updateProject(selectedProject.id, projectData)
+        toast({
+          title: 'Project updated.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      } else {
+        await addProject(projectData)
+        toast({
+          title: 'Project created.',
+          status: 'success',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
       onClose()
-      setProjectName('')
-      setClientId('')
-      setDescription('')
-      setStatus('active')
-      setBudget('')
-      setBudgetType('hourly')
-      setHourlyRate('')
     } catch (err) {
       console.error("Failed to save project:", err)
-      alert(`Error saving project: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      toast({
+        title: "Error saving project.",
+        description: err instanceof Error ? err.message : "Could not save project.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
     } finally {
       setIsSubmitting(false)
     }
@@ -132,7 +219,7 @@ const Projects = () => {
     <Box>
       <HStack justify="space-between" mb={6}>
         <Heading>Projects</Heading>
-        <Button colorScheme="blue" leftIcon={<MdAdd />} onClick={onOpen}>
+        <Button colorScheme="blue" leftIcon={<MdAdd />} onClick={handleOpenNewModal}>
           New Project
         </Button>
       </HStack>
@@ -163,8 +250,8 @@ const Projects = () => {
           </Thead>
           <Tbody>
             {filteredProjects.map((project) => {
-              const client = clientList.find(c => c.id === project.client)
-              const clientName = client?.name || 'N/A'
+              // project.clientは既にClientオブジェクトになっているはず
+              const clientName = project.client.name || 'N/A'
 
               return (
                 <Tr key={project.id}>
@@ -185,11 +272,11 @@ const Projects = () => {
                     </Badge>
                   </Td>
                   <Td isNumeric>
-                    {project.budget != null ? `$${project.budget.toLocaleString()}` : 'N/A'}
+                    {project.budget != null ? `${project.budget.toLocaleString()}` : 'N/A'}
                   </Td>
                   <Td>
                     <HStack spacing={1}>
-                      <Button size="xs" variant="ghost" onClick={() => console.log('Edit', project.id)}>
+                      <Button size="xs" variant="ghost" onClick={() => handleOpenEditModal(project)}>
                         <Icon as={MdEdit} />
                       </Button>
                       <Button size="xs" variant="ghost" colorScheme="red" onClick={() => handleArchive(project.id)}>
@@ -205,7 +292,7 @@ const Projects = () => {
       ) : (
         <Box textAlign="center" p={8}>
           <Text fontSize="lg">No projects found{searchTerm ? ' matching your search' : ''}.</Text>
-          <Button mt={4} colorScheme="blue" leftIcon={<MdAdd />} onClick={onOpen}>
+          <Button mt={4} colorScheme="blue" leftIcon={<MdAdd />} onClick={handleOpenNewModal}>
             Create your first project
           </Button>
         </Box>
@@ -214,7 +301,7 @@ const Projects = () => {
       <Modal isOpen={isOpen} onClose={onClose} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>New Project</ModalHeader>
+          <ModalHeader>{selectedProject ? 'Edit Project' : 'New Project'}</ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={6}>
             <Box as="form" onSubmit={(e: React.FormEvent<HTMLDivElement>) => e.preventDefault()}>
@@ -233,7 +320,6 @@ const Projects = () => {
                   <Select
                     placeholder="Select client"
                     value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
                     isDisabled={clientsLoading}
                   >
                     {clientList.map(client => (
@@ -310,7 +396,7 @@ const Projects = () => {
               onClick={handleSaveProject}
               isLoading={isSubmitting}
             >
-              Save Project
+              {selectedProject ? 'Update Project' : 'Save Project'}
             </Button>
           </ModalFooter>
         </ModalContent>

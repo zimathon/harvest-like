@@ -33,14 +33,19 @@ import {
 import { MdEdit, MdDelete, MdPlayArrow, MdStop } from 'react-icons/md';
 import { useTimeEntries } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
+import { useAuth } from '../contexts/AuthContext'; // useAuthをインポート
+import { TimeEntry, Task } from '../types'; // ProjectとTaskをインポート
 
 const TimeTracking = () => {
+  const { projects } = useProjects();
+  const { user } = useAuth();
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedTaskId, setSelectedTaskId] = useState<string>('');
   const [duration, setDuration] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [tabIndex, setTabIndex] = useState<number>(0);
+  const [selectedTimeEntry, setSelectedTimeEntry] = useState<TimeEntry | null>(null); // 編集用
   
   const toast = useToast();
   
@@ -55,128 +60,154 @@ const TimeTracking = () => {
     stopTimer,
     activeEntry 
   } = useTimeEntries();
-  
-  const { projects, fetchProjects } = useProjects();
-  
-  // モックタスクデータ
-  const tasks = [
-    { id: '1', name: 'Design' },
-    { id: '2', name: 'Development' },
-    { id: '3', name: 'Meeting' },
-    { id: '4', name: 'Research' }
-  ];
-  
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    if (selectedProjectId) {
+      const project = projects.find(p => p.id === selectedProjectId);
+      if (project) {
+        setTasks(project.tasks || []);
+      } else {
+        setTasks([]);
+      }
+    } else {
+      setTasks([]);
+    }
+  }, [selectedProjectId, projects]);
+
   useEffect(() => {
     fetchTimeEntries();
-    fetchProjects();
-  }, []);
-  
-  // 現在の日付データのみをフィルタリング
+  }, [fetchTimeEntries]);
+
+  useEffect(() => {
+    if (selectedTimeEntry) {
+      setDate(selectedTimeEntry.date);
+      setSelectedProjectId(selectedTimeEntry.project.id);
+      setSelectedTaskId(selectedTimeEntry.task.id || '');
+      setDuration(formatDuration(selectedTimeEntry.duration));
+      setNotes(selectedTimeEntry.notes || '');
+    }
+  }, [selectedTimeEntry]);
+
+      // Helper function to format duration
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
+
+  // Filter time entries for today
   const getTodayEntries = () => {
     const today = new Date().toISOString().split('T')[0];
     return timeEntries.filter(entry => entry.date === today);
   };
-  
-  // 今週のデータをフィルタリング
+
+  // Filter time entries for the current week
   const getWeekEntries = () => {
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // 週の始まり（日曜日）
-    
+    const today = new Date();
+    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
+    const lastDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+
     return timeEntries.filter(entry => {
       const entryDate = new Date(entry.date);
-      return entryDate >= startOfWeek;
+      return entryDate >= firstDayOfWeek && entryDate <= lastDayOfWeek;
     });
   };
-  
-  // 今月のデータをフィルタリング
+
+  // Filter time entries for the current month
   const getMonthEntries = () => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
     return timeEntries.filter(entry => {
       const entryDate = new Date(entry.date);
-      return entryDate >= startOfMonth;
+      return entryDate >= firstDayOfMonth && entryDate <= lastDayOfMonth;
     });
   };
-  
-  // プロジェクト名を取得
-  const getProjectName = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    return project ? project.name : 'Unknown Project';
-  };
-  
-  // タスク名を取得
-  const getTaskName = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    return task ? task.name : 'Unknown Task';
-  };
-  
-  // 時間をフォーマット
-  const formatDuration = (hours: number) => {
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    return `${h}:${m.toString().padStart(2, '0')}`;
-  };
-  
-  // 新しい時間エントリーを追加
-  const handleAddTimeEntry = async () => {
+
+  // Save/Update Time Entry
+  const handleSaveTimeEntry = async () => {
     if (!selectedProjectId || !selectedTaskId || !duration) {
       toast({
         title: 'Error',
-        description: 'Please fill all required fields',
+        description: 'Please fill in all required fields (Project, Task, Duration)',
         status: 'error',
         duration: 3000,
         isClosable: true
       });
       return;
     }
-    
-    // 時間形式を数値に変換 (例: "1:30" → 1.5)
-    let durationValue = 0;
-    if (duration.includes(':')) {
-      const [hours, minutes] = duration.split(':');
-      durationValue = parseInt(hours) + parseInt(minutes) / 60;
-    } else {
-      durationValue = parseFloat(duration);
-    }
-    
-    try {
-      await addTimeEntry({
-        userId: '1', // 現在のユーザーID
-        projectId: selectedProjectId,
-        taskId: selectedTaskId,
-        date,
-        duration: durationValue,
-        notes,
-        isBillable: true,
-        isRunning: false,
-        startTime: undefined,
-        endTime: undefined
-      });
-      
-      // フォームをリセット
-      setDuration('');
-      setNotes('');
-      
+
+    const [hours, minutes] = duration.split(':').map(Number);
+    const totalSeconds = (hours * 3600) + (minutes * 60);
+
+    const selectedProject = projects.find(p => p.id === selectedProjectId);
+    const selectedTask = tasks.find(t => t.id === selectedTaskId);
+
+    if (!selectedProject || !selectedTask) {
       toast({
-        title: 'Success',
-        description: 'Time entry added successfully',
-        status: 'success',
-        duration: 2000,
+        title: 'Error',
+        description: 'Selected project or task not found.',
+        status: 'error',
+        duration: 3000,
         isClosable: true
       });
+      return;
+    }
+
+    const timeEntryData = {
+      userId: user?.id || '',
+      project: selectedProject,
+      task: selectedTask,
+      date: date,
+      duration: totalSeconds,
+      notes: notes,
+      isBillable: selectedTask.isBillable,
+      isRunning: false,
+    };
+
+    try {
+      if (selectedTimeEntry) {
+        await updateTimeEntry(selectedTimeEntry.id, timeEntryData);
+        toast({
+          title: 'Success',
+          description: 'Time entry updated successfully',
+          status: 'success',
+          duration: 2000,
+          isClosable: true
+        });
+      } else {
+        await addTimeEntry(timeEntryData);
+        toast({
+          title: 'Success',
+          description: 'Time entry added successfully',
+          status: 'success',
+          duration: 2000,
+          isClosable: true
+        });
+      }
+
+      // フォームをリセット
+      setSelectedTimeEntry(null);
+      setDuration('');
+      setNotes('');
+      setSelectedProjectId('');
+      setSelectedTaskId('');
+      setDate(new Date().toISOString().split('T')[0]);
+
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Failed to add time entry',
+        description: 'Failed to save time entry',
         status: 'error',
         duration: 3000,
         isClosable: true
       });
     }
   };
-  
+
   // タイマーを開始
   const handleStartTimer = async () => {
     if (!selectedProjectId || !selectedTaskId) {
@@ -189,7 +220,7 @@ const TimeTracking = () => {
       });
       return;
     }
-    
+
     try {
       await startTimer(selectedProjectId, selectedTaskId, notes);
       toast({
@@ -209,7 +240,7 @@ const TimeTracking = () => {
       });
     }
   };
-  
+
   // タイマーを停止
   const handleStopTimer = async () => {
     try {
@@ -233,7 +264,7 @@ const TimeTracking = () => {
       });
     }
   };
-  
+
   // 時間エントリーを削除
   const handleDeleteEntry = async (id: string) => {
     try {
@@ -254,6 +285,11 @@ const TimeTracking = () => {
         isClosable: true
       });
     }
+  };
+
+  // 時間エントリーを編集
+  const handleEditEntry = (entry: TimeEntry) => {
+    setSelectedTimeEntry(entry);
   };
   
   return (
@@ -283,6 +319,7 @@ const TimeTracking = () => {
                   placeholder="Select task"
                   value={selectedTaskId}
                   onChange={(e) => setSelectedTaskId(e.target.value)}
+                  isDisabled={!selectedProjectId} // プロジェクトが選択されていないとタスクは選択不可
                 >
                   {tasks.map(task => (
                     <option key={task.id} value={task.id}>{task.name}</option>
@@ -345,10 +382,10 @@ const TimeTracking = () => {
               
               <Button 
                 colorScheme="blue"
-                onClick={handleAddTimeEntry}
+                onClick={handleSaveTimeEntry}
                 disabled={activeEntry !== null}
               >
-                Save Entry
+                {selectedTimeEntry ? 'Update Entry' : 'Save Entry'}
               </Button>
             </HStack>
             
@@ -357,7 +394,7 @@ const TimeTracking = () => {
                 <Flex justify="space-between" align="center">
                   <Box>
                     <Text fontWeight="bold">Timer Running</Text>
-                    <Text>{getProjectName(activeEntry.projectId)} - {getTaskName(activeEntry.taskId)}</Text>
+                    <Text>{activeEntry.project.name} - {activeEntry.task.name}</Text>
                     <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
                   </Box>
                   <Badge colorScheme="green" p={2} borderRadius="md">
@@ -397,8 +434,8 @@ const TimeTracking = () => {
                 <Tbody>
                   {getTodayEntries().map(entry => (
                     <Tr key={entry.id}>
-                      <Td>{getProjectName(entry.projectId)}</Td>
-                      <Td>{getTaskName(entry.taskId)}</Td>
+                      <Td>{entry.project.name}</Td>
+                      <Td>{entry.task.name}</Td>
                       <Td>{entry.notes || '-'}</Td>
                       <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration)}</Td>
                       <Td>
@@ -408,6 +445,7 @@ const TimeTracking = () => {
                             icon={<MdEdit />}
                             size="sm"
                             variant="ghost"
+                            onClick={() => handleEditEntry(entry)}
                           />
                           <IconButton
                             aria-label="Delete"
@@ -449,8 +487,8 @@ const TimeTracking = () => {
                   {getWeekEntries().map(entry => (
                     <Tr key={entry.id}>
                       <Td>{entry.date}</Td>
-                      <Td>{getProjectName(entry.projectId)}</Td>
-                      <Td>{getTaskName(entry.taskId)}</Td>
+                      <Td>{entry.project.name}</Td>
+                      <Td>{entry.task.name}</Td>
                       <Td>{entry.notes || '-'}</Td>
                       <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration)}</Td>
                       <Td>
@@ -460,6 +498,7 @@ const TimeTracking = () => {
                             icon={<MdEdit />}
                             size="sm"
                             variant="ghost"
+                            onClick={() => handleEditEntry(entry)}
                           />
                           <IconButton
                             aria-label="Delete"
@@ -501,8 +540,8 @@ const TimeTracking = () => {
                   {getMonthEntries().map(entry => (
                     <Tr key={entry.id}>
                       <Td>{entry.date}</Td>
-                      <Td>{getProjectName(entry.projectId)}</Td>
-                      <Td>{getTaskName(entry.taskId)}</Td>
+                      <Td>{entry.project.name}</Td>
+                      <Td>{entry.task.name}</Td>
                       <Td>{entry.notes || '-'}</Td>
                       <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration)}</Td>
                       <Td>
@@ -512,6 +551,7 @@ const TimeTracking = () => {
                             icon={<MdEdit />}
                             size="sm"
                             variant="ghost"
+                            onClick={() => handleEditEntry(entry)}
                           />
                           <IconButton
                             aria-label="Delete"

@@ -83,8 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (token) {
+        if (true) {
           // トークンがある場合、現在のユーザー情報を取得
           const user = await authService.getCurrentUser();
           dispatch({ type: 'LOGIN_SUCCESS', payload: user });
@@ -92,7 +91,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           dispatch({ type: 'LOGOUT' });
         }
       } catch (error) {
-        localStorage.removeItem('token');
         dispatch({ type: 'LOGOUT' });
       }
     };
@@ -105,10 +103,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'LOADING' });
     try {
       // APIを使用してログイン
-      const { token, user } = await authService.login(email, password);
+      const { user } = await authService.login(email, password);
       
-      // トークンとユーザー情報を保存
-      localStorage.setItem('token', token);
+      // ユーザー情報を保存
       dispatch({ type: 'LOGIN_SUCCESS', payload: user });
     } catch (error) {
       dispatch({ type: 'LOGIN_FAILURE', payload: 'Login failed. Please check your credentials.' });
@@ -125,7 +122,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Logout error:', error);
     } finally {
       // ローカルストレージからトークンを削除
-      localStorage.removeItem('token');
       dispatch({ type: 'LOGOUT' });
     }
   };

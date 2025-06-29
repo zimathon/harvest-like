@@ -31,10 +31,10 @@ export const getExpenseById = async (id: string): Promise<Expense> => {
 };
 
 // Create expense
-export const createExpense = async (expenseData: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'status'> & { project: string }): Promise<Expense> => {
+export const createExpense = async (expenseData: Omit<Expense, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'status'>): Promise<Expense> => {
   // APIに送信するデータを作成
   const payload = {
-    project: expenseData.project, // <<< expenseData.project をそのまま使う
+    project: expenseData.project.id, // project.id を送信
     category: expenseData.category,
     date: expenseData.date,
     amount: expenseData.amount,
@@ -50,10 +50,10 @@ export const createExpense = async (expenseData: Omit<Expense, 'id' | 'userId' |
 };
 
 // Update expense
-export const updateExpense = async (id: string, expenseData: Partial<Expense> & { project?: string }): Promise<Expense> => {
+export const updateExpense = async (id: string, expenseData: Partial<Expense>): Promise<Expense> => {
   // APIに送信するデータを作成 (更新なので、存在するフィールドのみ含めるのが一般的)
   const payload: Record<string, any> = {};
-  if (expenseData.project) payload.project = expenseData.project; // <<< project キーで渡す
+  if (expenseData.project) payload.project = expenseData.project.id; // project.id を送信
   if (expenseData.category) payload.category = expenseData.category;
   if (expenseData.date) payload.date = expenseData.date;
   if (expenseData.amount !== undefined) payload.amount = expenseData.amount;
