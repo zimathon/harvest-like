@@ -2,7 +2,7 @@ import api from './api';
 import { User } from '../types';
 
 // Login user
-export const login = async (email: string, password: string): Promise<{ user: User }> => {
+export const login = async (email: string, password: string): Promise<{ user: User, token: string }> => {
   const response = await api.post('/auth/login', { email, password });
   return response.data;
 };

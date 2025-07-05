@@ -18,38 +18,34 @@ import {
   Menu,
   MenuButton,
   MenuList,
-  MenuItem
+  MenuItem,
+  Spinner,
+  Alert,
+  AlertIcon
 } from '@chakra-ui/react'
 import { MdSearch, MdMoreVert, MdVisibility, MdEdit, MdSend } from 'react-icons/md'
-
-const invoicesData = [
-  {
-    id: 'INV-001',
-    client: 'Acme Inc.',
-    amount: '$3,500.00',
-    date: '2025-04-01',
-    dueDate: '2025-05-01',
-    status: 'Unpaid'
-  },
-  {
-    id: 'INV-002',
-    client: 'TechCorp',
-    amount: '$5,200.00',
-    date: '2025-03-15',
-    dueDate: '2025-04-15',
-    status: 'Overdue'
-  },
-  {
-    id: 'INV-003',
-    client: 'Global Retail',
-    amount: '$1,800.00',
-    date: '2025-04-10',
-    dueDate: '2025-05-10',
-    status: 'Paid'
-  }
-]
+import { useInvoices } from '../contexts/InvoiceContext'
 
 const Invoices = () => {
+  const { invoices, isLoading, error } = useInvoices();
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+        <Spinner size="xl" />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert status="error">
+        <AlertIcon />
+        Error loading invoices: {error}
+      </Alert>
+    );
+  }
+
   return (
     <Box>
       <HStack justify="space-between" mb={6}>
@@ -66,7 +62,7 @@ const Invoices = () => {
         </InputGroup>
       </HStack>
       
-      {invoicesData.length > 0 ? (
+      {invoices.length > 0 ? (
         <Table variant="simple">
           <Thead>
             <Tr>
@@ -80,19 +76,19 @@ const Invoices = () => {
             </Tr>
           </Thead>
           <Tbody>
-            {invoicesData.map((invoice) => (
+            {invoices.map((invoice) => (
               <Tr key={invoice.id}>
-                <Td fontWeight="medium">{invoice.id}</Td>
-                <Td>{invoice.client}</Td>
-                <Td>{invoice.amount}</Td>
-                <Td>{invoice.date}</Td>
-                <Td>{invoice.dueDate}</Td>
+                <Td fontWeight="medium">{invoice.number}</Td>
+                <Td>{invoice.clientId}</Td> {/* Assuming clientId is displayed for now */}
+                <Td>${invoice.amount.toFixed(2)}</Td>
+                <Td>{new Date(invoice.issueDate).toLocaleDateString()}</Td>
+                <Td>{new Date(invoice.dueDate).toLocaleDateString()}</Td>
                 <Td>
                   <Badge
                     colorScheme={
-                      invoice.status === 'Paid'
+                      invoice.status === 'paid'
                         ? 'green'
-                        : invoice.status === 'Overdue'
+                        : invoice.status === 'overdue'
                         ? 'red'
                         : 'yellow'
                     }

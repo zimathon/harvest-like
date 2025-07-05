@@ -16,10 +16,35 @@ import {
   TabPanels,
   TabPanel,
   FormControl,
-  FormLabel
+  FormLabel,
+  Spinner,
+  Alert,
+  AlertIcon
 } from '@chakra-ui/react'
+import { useProjects } from '../contexts/ProjectContext'
+import { useUsers } from '../contexts/UserContext'
 
 const Reports = () => {
+  const { projects, isLoading: projectsLoading, error: projectsError } = useProjects();
+  const { users, isLoading: usersLoading, error: usersError } = useUsers();
+
+  if (projectsLoading || usersLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+        <Spinner size="xl" />
+      </Box>
+    );
+  }
+
+  if (projectsError || usersError) {
+    return (
+      <Alert status="error">
+        <AlertIcon />
+        Error loading data: {projectsError || usersError}
+      </Alert>
+    );
+  }
+
   return (
     <Box>
       <Heading mb={6}>Reports</Heading>
@@ -48,9 +73,9 @@ const Reports = () => {
                   <FormLabel>Project</FormLabel>
                   <Select defaultValue="all">
                     <option value="all">All Projects</option>
-                    <option value="1">Website Redesign</option>
-                    <option value="2">Mobile App Development</option>
-                    <option value="3">Marketing Campaign</option>
+                    {projects.map(project => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
                   </Select>
                 </FormControl>
               </GridItem>
@@ -60,9 +85,9 @@ const Reports = () => {
                   <FormLabel>Team Member</FormLabel>
                   <Select defaultValue="all">
                     <option value="all">All Team Members</option>
-                    <option value="1">John Doe</option>
-                    <option value="2">Jane Smith</option>
-                    <option value="3">Bob Johnson</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
                   </Select>
                 </FormControl>
               </GridItem>

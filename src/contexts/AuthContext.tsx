@@ -83,7 +83,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadUser = async () => {
       try {
-        if (true) {
+        const token = localStorage.getItem('token');
+        if (token) {
           // トークンがある場合、現在のユーザー情報を取得
           const user = await authService.getCurrentUser();
           dispatch({ type: 'LOGIN_SUCCESS', payload: user });
@@ -103,8 +104,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'LOADING' });
     try {
       // APIを使用してログイン
-      const { user } = await authService.login(email, password);
+      const { user, token } = await authService.login(email, password);
       
+      // トークンをローカルストレージに保存
+      localStorage.setItem('token', token);
+
       // ユーザー情報を保存
       dispatch({ type: 'LOGIN_SUCCESS', payload: user });
     } catch (error) {

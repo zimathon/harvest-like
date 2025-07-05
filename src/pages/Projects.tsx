@@ -35,7 +35,7 @@ import {
   useToast, // Toastを追加
   VStack // VStackを追加
 } from '@chakra-ui/react'
-import React, { useEffect, useState } from 'react' // useEffectを追加
+import React, { useEffect, useMemo, useState } from 'react' // useEffectを追加
 import { MdAdd, MdArchive, MdEdit, MdSearch } from 'react-icons/md'
 import { useClients } from '../contexts/ClientContext.js'
 import { useProjects } from '../contexts/ProjectContext.js'
@@ -45,7 +45,8 @@ type ProjectStatus = Project['status']
 
 const Projects = () => {
   const { projects, isLoading, error, updateProject, addProject } = useProjects()
-  const { clients: clientList, isLoading: clientsLoading } = useClients()
+  const { clients, isLoading: clientsLoading } = useClients()
+  const clientList = useMemo(() => clients, [clients])
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useReducer, ReactNode, useCallback } from 'react';
 import { TimeEntry } from '../types';
 import { useAuth } from './AuthContext';
 import * as timeEntryService from '../services/timeEntryService';
@@ -109,7 +109,7 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
 
   // 時間記録一覧取得
-  const fetchTimeEntries = async () => {
+  const fetchTimeEntries = useCallback(async () => {
     if (!user) return;
     
     dispatch({ type: 'FETCH_ENTRIES_START' });
@@ -130,7 +130,7 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
         payload: 'Failed to fetch time entries. Please try again.' 
       });
     }
-  };
+  }, [user]);
 
   // 時間記録追加
   const addTimeEntry = async (entryData: Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -207,7 +207,7 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       fetchTimeEntries();
     }
-  }, [user]);
+  }, [user, fetchTimeEntries]);
 
   return (
     <TimeEntryContext.Provider

@@ -15,38 +15,34 @@ import {
   InputGroup,
   InputLeftElement,
   Input,
-  Icon
+  Icon,
+  Spinner,
+  Alert,
+  AlertIcon
 } from '@chakra-ui/react'
 import { MdSearch, MdMail, MdEdit, MdDelete } from 'react-icons/md'
-
-const teamData = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    role: 'Admin',
-    status: 'Active',
-    hoursThisWeek: 35
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    role: 'Developer',
-    status: 'Active',
-    hoursThisWeek: 40
-  },
-  {
-    id: 3,
-    name: 'Bob Johnson',
-    email: 'bob.johnson@example.com',
-    role: 'Designer',
-    status: 'Inactive',
-    hoursThisWeek: 0
-  }
-]
+import { useUsers } from '../contexts/UserContext'
 
 const Team = () => {
+  const { users, isLoading, error } = useUsers();
+
+  if (isLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" height="200px">
+        <Spinner size="xl" />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert status="error">
+        <AlertIcon />
+        Error loading team members: {error}
+      </Alert>
+    );
+  }
+
   return (
     <Box>
       <HStack justify="space-between" mb={6}>
@@ -63,7 +59,7 @@ const Team = () => {
         </InputGroup>
       </HStack>
       
-      {teamData.length > 0 ? (
+      {users.length > 0 ? (
         <Table variant="simple">
           <Thead>
             <Tr>
@@ -76,7 +72,7 @@ const Team = () => {
             </Tr>
           </Thead>
           <Tbody>
-            {teamData.map((member) => (
+            {users.map((member) => (
               <Tr key={member.id}>
                 <Td>
                   <HStack>
@@ -87,11 +83,11 @@ const Team = () => {
                 <Td>{member.email}</Td>
                 <Td>{member.role}</Td>
                 <Td>
-                  <Badge colorScheme={member.status === 'Active' ? 'green' : 'gray'}>
-                    {member.status}
+                  <Badge colorScheme={member.role === 'admin' || member.role === 'manager' ? 'green' : 'gray'}>
+                    {member.role}
                   </Badge>
                 </Td>
-                <Td>{member.hoursThisWeek}</Td>
+                <Td>N/A</Td> {/* Hours This Week is not available in User type */}
                 <Td>
                   <HStack spacing={2}>
                     <Button size="sm" leftIcon={<MdMail />} variant="ghost">

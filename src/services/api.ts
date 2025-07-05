@@ -18,6 +18,7 @@ if (!import.meta.env.VITE_API_BASE_URL && import.meta.env.MODE !== 'production')
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL, // 環境変数から取得した URL を使用
+  withCredentials: true, // Cookieを送信するために追加
   headers: {
     'Content-Type': 'application/json'
   }
