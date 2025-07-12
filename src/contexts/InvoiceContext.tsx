@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import * as invoiceService from '../services/invoiceService';
 import { Invoice } from '../types';
+import { useAuth } from './AuthContext.js'; // useAuthフックをインポート
 
 // 請求書状態の型定義
 interface InvoiceState {
@@ -47,6 +48,7 @@ const invoiceReducer = (state: InvoiceState, action: InvoiceAction): InvoiceStat
 // プロバイダーコンポーネント
 export const InvoiceProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(invoiceReducer, initialState);
+  const { isAuthenticated } = useAuth(); // AuthContextから認証状態を取得
 
   // 請求書一覧取得
   const fetchInvoices = async () => {
@@ -61,10 +63,12 @@ export const InvoiceProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 初回マウント時に請求書一覧を取得
+  // 初回マウント時、または認証状態が変化したときに請求書一覧を取得
   useEffect(() => {
-    fetchInvoices();
-  }, []);
+    if (isAuthenticated) {
+      fetchInvoices();
+    }
+  }, [isAuthenticated]);
 
   return (
     <InvoiceContext.Provider

@@ -11,6 +11,7 @@ import expenseRoutes from './routes/expenses.js';
 import projectRoutes from './routes/projects.js';
 import timeEntryRoutes from './routes/timeEntries.js';
 import userRoutes from './routes/users.js';
+import invoiceRoutes from './routes/invoices.js';
 
 // Load environment variables (dotenv.config() は一度だけ呼び出す)
 dotenv.config(); // .env ファイルを読み込む
@@ -56,6 +57,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/time-entries', timeEntryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/clients', clientRoutes);
+app.use('/api/invoices', invoiceRoutes);
 
 // Error handler
 interface AppError extends Error {

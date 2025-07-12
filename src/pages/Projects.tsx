@@ -4,6 +4,7 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   FormControl,
   FormLabel,
   Heading,
@@ -36,7 +37,7 @@ import {
   VStack // VStackを追加
 } from '@chakra-ui/react'
 import React, { useEffect, useMemo, useState } from 'react' // useEffectを追加
-import { MdAdd, MdArchive, MdEdit, MdSearch } from 'react-icons/md'
+import { MdAdd, MdArchive, MdEdit, MdSearch, MdDelete } from 'react-icons/md'
 import { useClients } from '../contexts/ClientContext.js'
 import { useProjects } from '../contexts/ProjectContext.js'
 import { Project } from '../types/index.js'
@@ -46,7 +47,10 @@ type ProjectStatus = Project['status']
 const Projects = () => {
   const { projects, isLoading, error, updateProject, addProject } = useProjects()
   const { clients, isLoading: clientsLoading } = useClients()
-  const clientList = useMemo(() => clients, [clients])
+  const clientList = useMemo(() => {
+    console.log('Debug: clients from context =', clients);
+    return clients;
+  }, [clients])
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [searchTerm, setSearchTerm] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -59,6 +63,7 @@ const Projects = () => {
   )
 
   const handleArchive = async (id: string) => {
+    console.log('Debug: Archiving project with ID =', id);
     if (window.confirm('Are you sure you want to archive this project?')) {
       try {
         await updateProject(id, { status: 'archived' }) // statusをarchivedに更新
@@ -89,20 +94,31 @@ const Projects = () => {
   const [budget, setBudget] = useState<number | string>('')
   const [budgetType, setBudgetType] = useState<'hourly' | 'fixed'>('hourly')
   const [hourlyRate, setHourlyRate] = useState<number | string>('')
+  const [tasks, setTasks] = useState<Array<{ name: string; hourlyRate?: number; isBillable: boolean }>>([])
   // --- Project Form State End ---
 
   // モーダル開閉時の初期化/設定
   useEffect(() => {
+    console.log('Debug: useEffect triggered, isOpen =', isOpen, 'selectedProject =', selectedProject);
     if (isOpen) {
       if (selectedProject) {
+        console.log('Debug: Setting form for editing project');
+        console.log('Debug: selectedProject.client =', selectedProject.client);
         setProjectName(selectedProject.name)
-        setClientId(selectedProject.client.id) // client.idを使用
+        // clientが文字列の場合とオブジェクトの場合を処理
+        const clientIdValue = typeof selectedProject.client === 'string' 
+          ? selectedProject.client 
+          : (selectedProject.client._id || selectedProject.client.id);
+        setClientId(clientIdValue)
         setDescription(selectedProject.description || '')
         setStatus(selectedProject.status)
         setBudget(selectedProject.budget || '')
         setBudgetType(selectedProject.budgetType || 'hourly')
         setHourlyRate(selectedProject.hourlyRate || '')
+        setTasks(selectedProject.tasks || [])
+        console.log('Debug: Form state set - projectName:', selectedProject.name, 'clientId:', clientIdValue);
       } else {
+        console.log('Debug: Setting form for new project');
         // 新規作成時はフォームをリセット
         setProjectName('')
         setClientId('')
@@ -111,6 +127,7 @@ const Projects = () => {
         setBudget('')
         setBudgetType('hourly')
         setHourlyRate('')
+        setTasks([])
       }
     }
   }, [isOpen, selectedProject])
@@ -123,12 +140,18 @@ const Projects = () => {
 
   // 編集モーダルを開く
   const handleOpenEditModal = (project: Project) => {
+    console.log('Debug: Opening edit modal for project =', project);
     setSelectedProject(project) // 編集対象をセット
     onOpen()
   }
 
   // --- Save Project Logic ---
   const handleSaveProject = async () => {
+    console.log('Debug: handleSaveProject called');
+    console.log('Debug: projectName =', projectName);
+    console.log('Debug: clientId =', clientId);
+    console.log('Debug: selectedProject =', selectedProject);
+    
     if (!projectName || !clientId) {
       toast({
         title: 'Validation Error',
@@ -139,16 +162,36 @@ const Projects = () => {
       });
       return
     }
+
+    // クライアントデータが読み込まれていない場合は処理を停止
+    if (clientsLoading) {
+      toast({
+        title: 'Please wait',
+        description: 'Loading client data...',
+        status: 'info',
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+
     setIsSubmitting(true)
     try {
       const budgetNumber = typeof budget === 'string' ? parseFloat(budget) : budget || 0
       const rateNumber = typeof hourlyRate === 'string' ? parseFloat(hourlyRate) : hourlyRate || 0
 
-      const selectedClient = clientList.find(c => c.id === clientId);
+      // クライアントデータが読み込まれた後にバリデーションを実行
+      console.log('Debug: clientId =', clientId);
+      console.log('Debug: clientList =', clientList);
+      console.log('Debug: clientList.length =', clientList.length);
+      
+      const selectedClient = clientList.find(c => (c._id || c.id) === clientId);
+      console.log('Debug: selectedClient =', selectedClient);
+      
       if (!selectedClient) {
         toast({
           title: 'Validation Error',
-          description: 'Selected client not found.',
+          description: 'Selected client not found. Please refresh the page and try again.',
           status: 'error',
           duration: 3000,
           isClosable: true,
@@ -158,16 +201,17 @@ const Projects = () => {
 
       const projectData = {
         name: projectName,
-        client: selectedClient, // Clientオブジェクトを渡す
+        client: clientId, // Client IDを渡す
         description,
         status,
         budget: isNaN(budgetNumber) ? 0 : budgetNumber,
         budgetType,
         hourlyRate: isNaN(rateNumber) ? 0 : rateNumber,
-      }
+        tasks: tasks,
+      };
 
       if (selectedProject) {
-        await updateProject(selectedProject.id, projectData)
+        await updateProject(selectedProject._id || selectedProject.id, projectData)
         toast({
           title: 'Project updated.',
           status: 'success',
@@ -198,6 +242,21 @@ const Projects = () => {
     }
   }
   // --- Save Project Logic End ---
+
+  // タスク管理のヘルパー関数
+  const addTask = () => {
+    setTasks([...tasks, { name: '', hourlyRate: 0, isBillable: true }])
+  }
+
+  const updateTask = (index: number, field: string, value: any) => {
+    const updatedTasks = [...tasks]
+    updatedTasks[index] = { ...updatedTasks[index], [field]: value }
+    setTasks(updatedTasks)
+  }
+
+  const removeTask = (index: number) => {
+    setTasks(tasks.filter((_, i) => i !== index))
+  }
 
   if (isLoading || clientsLoading) {
     return (
@@ -255,7 +314,7 @@ const Projects = () => {
               const clientName = project.client.name || 'N/A'
 
               return (
-                <Tr key={project.id}>
+                <Tr key={project._id || project.id}>
                   <Td fontWeight="medium">{project.name}</Td>
                   <Td>{clientName}</Td>
                   <Td>
@@ -280,7 +339,7 @@ const Projects = () => {
                       <Button size="xs" variant="ghost" onClick={() => handleOpenEditModal(project)}>
                         <Icon as={MdEdit} />
                       </Button>
-                      <Button size="xs" variant="ghost" colorScheme="red" onClick={() => handleArchive(project.id)}>
+                      <Button size="xs" variant="ghost" colorScheme="red" onClick={() => handleArchive(project._id || project.id)}>
                         <Icon as={MdArchive} />
                       </Button>
                     </HStack>
@@ -322,11 +381,22 @@ const Projects = () => {
                     placeholder="Select client"
                     value={clientId}
                     isDisabled={clientsLoading}
+                    onChange={(e) => {
+                      console.log('Debug: Client selected =', e.target.value);
+                      setClientId(e.target.value);
+                    }}
                   >
-                    {clientList.map(client => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
+                    {clientList.map(client => {
+                      console.log('Debug: Rendering client option =', client);
+                      return (
+                        <option key={client._id || client.id} value={client._id || client.id}>{client.name}</option>
+                      );
+                    })}
                   </Select>
+                  {clientsLoading && <Text fontSize="sm" color="gray.500">Loading clients...</Text>}
+                  {!clientsLoading && clientList.length === 0 && (
+                    <Text fontSize="sm" color="red.500">No clients available. Please create a client first.</Text>
+                  )}
                 </FormControl>
 
                 <FormControl>
@@ -384,6 +454,60 @@ const Projects = () => {
                   )}
                 </HStack>
 
+                {/* タスク管理セクション */}
+                <FormControl>
+                  <HStack justify="space-between" mb={3}>
+                    <FormLabel mb={0}>Tasks</FormLabel>
+                    <Button size="sm" leftIcon={<MdAdd />} onClick={addTask} type="button">
+                      Add Task
+                    </Button>
+                  </HStack>
+                  
+                  {tasks.length === 0 ? (
+                    <Text fontSize="sm" color="gray.500" fontStyle="italic">
+                      No tasks added yet. Add a task to enable time tracking.
+                    </Text>
+                  ) : (
+                    <VStack spacing={3} align="stretch">
+                      {tasks.map((task, index) => (
+                        <HStack key={index} spacing={2} p={3} border="1px" borderColor="gray.200" borderRadius="md">
+                          <Input
+                            placeholder="Task name"
+                            value={task.name}
+                            onChange={(e) => updateTask(index, 'name', e.target.value)}
+                            size="sm"
+                            flex={2}
+                          />
+                          <NumberInput
+                            size="sm"
+                            min={0}
+                            flex={1}
+                            value={task.hourlyRate || ''}
+                            onChange={(value) => updateTask(index, 'hourlyRate', parseFloat(value) || 0)}
+                          >
+                            <NumberInputField placeholder="Rate" />
+                          </NumberInput>
+                          <Checkbox
+                            isChecked={task.isBillable}
+                            onChange={(e) => updateTask(index, 'isBillable', e.target.checked)}
+                          >
+                            Billable
+                          </Checkbox>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="red"
+                            onClick={() => removeTask(index)}
+                            type="button"
+                          >
+                            <MdDelete />
+                          </Button>
+                        </HStack>
+                      ))}
+                    </VStack>
+                  )}
+                </FormControl>
+
               </VStack>
             </Box>
           </ModalBody>
@@ -396,6 +520,7 @@ const Projects = () => {
               colorScheme="blue"
               onClick={handleSaveProject}
               isLoading={isSubmitting}
+              isDisabled={isSubmitting || clientsLoading}
             >
               {selectedProject ? 'Update Project' : 'Save Project'}
             </Button>

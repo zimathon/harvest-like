@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import * as clientService from '../services/clientService.js'; // APIサービスをインポート
 import { Client } from '../types/index.js'; // Client 型をインポート
+import { useAuth } from './AuthContext.js'; // useAuthフックをインポート
 
 // クライアント状態の型定義
 interface ClientState {
@@ -67,6 +68,7 @@ const clientReducer = (state: ClientState, action: ClientAction): ClientState =>
 // プロバイダーコンポーネント
 export const ClientProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(clientReducer, initialState);
+  const { isAuthenticated } = useAuth(); // AuthContextから認証状態を取得
 
   // クライアント一覧取得
   const fetchClients = async () => {
@@ -119,11 +121,13 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 初回マウント時にクライアント一覧を取得
+  // 初回マウント時、または認証状態が変化したときにクライアント一覧を取得
   useEffect(() => {
-    fetchClients();
+    if (isAuthenticated) {
+      fetchClients();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated]);
 
   return (
     <ClientContext.Provider

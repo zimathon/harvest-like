@@ -44,10 +44,16 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
+    // 401エラーで、かつ現在のパスが /login でない場合のみリダイレクト
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      window.location.pathname !== '/login'
+    ) {
       // Unauthorized, clear token and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      // ログインページにリダイレクトする前に、他のAPI呼び出しをキャンセルすることも検討
       window.location.href = '/login';
     }
     return Promise.reject(error);

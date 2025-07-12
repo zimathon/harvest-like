@@ -70,6 +70,20 @@ Follow these instructions to set up and run the project locally.
 
     The frontend development server will typically run on `http://localhost:5173` (or as configured by Vite).
 
+## Creating an Admin User
+
+To create a new admin user, run the following command from the `server` directory:
+
+```bash
+npm run create-admin --name <your_name> --email <your_email> --password <your_password>
+```
+
+Replace `<your_name>`, `<your_email>`, and `<your_password>` with the desired credentials.
+
+A default admin user has been created with the following credentials:
+- **Email**: `admin2@example.com`
+- **Password**: `password`
+
 ## Project Structure
 
 * `server/`: Contains the Node.js/Express backend.

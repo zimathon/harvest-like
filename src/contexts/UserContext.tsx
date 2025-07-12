@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import * as userService from '../services/userService';
 import { User } from '../types';
+import { useAuth } from './AuthContext.js'; // useAuthフックをインポート
 
 // ユーザー状態の型定義
 interface UserState {
@@ -47,6 +48,7 @@ const userReducer = (state: UserState, action: UserAction): UserState => {
 // プロバイダーコンポーネント
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(userReducer, initialState);
+  const { isAuthenticated } = useAuth(); // AuthContextから認証状態を取得
 
   // ユーザー一覧取得
   const fetchUsers = async () => {
@@ -61,10 +63,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // 初回マウント時にユーザー一覧を取得
+  // 初回マウント時、または認証状態が変化したときにユーザー一覧を取得
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (isAuthenticated) {
+      fetchUsers();
+    }
+  }, [isAuthenticated]);
 
   return (
     <UserContext.Provider

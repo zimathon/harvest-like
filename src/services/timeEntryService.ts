@@ -29,28 +29,14 @@ export const getTimeEntryById = async (id: string): Promise<TimeEntry> => {
 };
 
 // Create time entry
-export const createTimeEntry = async (entryData: Omit<TimeEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<TimeEntry> => {
-  const response = await api.post('/time-entries', {
-    project: entryData.project.id,
-    task: entryData.task.id,
-    date: entryData.date,
-    duration: entryData.duration,
-    notes: entryData.notes,
-    isBillable: entryData.isBillable
-  });
+export const createTimeEntry = async (entryData: any): Promise<TimeEntry> => {
+  const response = await api.post('/time-entries', entryData);
   return response.data.data;
 };
 
 // Update time entry
-export const updateTimeEntry = async (id: string, entryData: Partial<TimeEntry>): Promise<TimeEntry> => {
-  const response = await api.put(`/time-entries/${id}`, {
-    project: entryData.project?.id,
-    task: entryData.task?.id,
-    date: entryData.date,
-    duration: entryData.duration,
-    notes: entryData.notes,
-    isBillable: entryData.isBillable
-  });
+export const updateTimeEntry = async (id: string, entryData: any): Promise<TimeEntry> => {
+  const response = await api.put(`/time-entries/${id}`, entryData);
   return response.data.data;
 };
 
@@ -60,10 +46,10 @@ export const deleteTimeEntry = async (id: string): Promise<void> => {
 };
 
 // Start timer
-export const startTimer = async (projectId: string, taskId: string, notes?: string): Promise<TimeEntry> => {
+export const startTimer = async (projectId: string, taskName: string, notes?: string): Promise<TimeEntry> => {
   const response = await api.post('/time-entries/timer/start', {
     project: projectId,
-    task: taskId,
+    task: taskName,
     date: new Date().toISOString().split('T')[0],
     notes
   });

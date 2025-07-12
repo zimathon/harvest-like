@@ -1,5 +1,5 @@
 import { Box } from '@chakra-ui/react'
-import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { Navigate, Outlet, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { useAuth } from './contexts/AuthContext'
 import Clients from './pages/Clients'
@@ -12,118 +12,53 @@ import Projects from './pages/Projects'
 import Reports from './pages/Reports'
 import Team from './pages/Team'
 import TimeTracking from './pages/TimeTracking'
-import { useEffect } from 'react'
 import { UserProvider } from './contexts/UserContext'
-import { InvoiceProvider } from './contexts/InvoiceContext' // InvoiceProviderをインポート
+import { InvoiceProvider } from './contexts/InvoiceContext'
 
-// 認証が必要なルートのラッパーコンポーネント
-const PrivateRoute = ({ children }: { children: JSX.Element }) => {
+// A wrapper for private routes to handle authentication and layout.
+const PrivateRoutes = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  // 認証状態の読み込み中は何も表示しない
+
   if (isLoading) {
     return null;
   }
-  
-  // 認証されていない場合はログインページにリダイレクト
+
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
-  
-  return children;
+
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
 };
 
 function App() {
-  useEffect(() => {
-    // 古いデータを削除
-    localStorage.removeItem('projects');
-    localStorage.removeItem('user');
-  }, []);
-
   return (
     <Router>
       <Box minH="100vh">
-        <UserProvider> {/* UserProviderでラップ */}
-          <InvoiceProvider> {/* InvoiceProviderでラップ */}
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              
-              <Route path="/" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/time" element={
-                <PrivateRoute>
-                  <Layout>
-                    <TimeTracking />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/expenses" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Expenses />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/projects" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Projects />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/team" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Team />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/reports" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Reports />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/invoices" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Invoices />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/manage" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Manage />
-                  </Layout>
-                </PrivateRoute>
-              } />
-              
-              <Route path="/clients" element={
-                <PrivateRoute>
-                  <Layout>
-                    <Clients />
-                  </Layout>
-                  </PrivateRoute>
-              } />
-              
-              {/* 存在しないパスの場合はダッシュボードにリダイレクト */}
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
-          </InvoiceProvider>
+        <UserProvider>
+            <InvoiceProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+
+                <Route element={<PrivateRoutes />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/time" element={<TimeTracking />} />
+                  <Route path="/expenses" element={<Expenses />} />
+                  <Route path="/projects" element={<Projects />} />
+                  <Route path="/team" element={<Team />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/invoices" element={<Invoices />} />
+                  <Route path="/manage" element={<Manage />} />
+                  <Route path="/clients" element={<Clients />} />
+                </Route>
+
+                {/* 存在しないパスの場合はダッシュボードにリダイレクト */}
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </InvoiceProvider>
         </UserProvider>
       </Box>
     </Router>

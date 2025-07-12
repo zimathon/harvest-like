@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
 import * as projectService from '../services/projectService.js';
 import { Project } from '../types/index.js';
+import { useAuth } from './AuthContext.js'; // useAuthフックをインポート
 
 // プロジェクト状態の型定義
 interface ProjectState {
@@ -31,8 +32,8 @@ type ProjectAction =
 // コンテキストの型定義
 interface ProjectContextType extends ProjectState {
   fetchProjects: () => Promise<void>;
-  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Project>;
-  updateProject: (id: string, project: Partial<Project>) => Promise<Project>;
+  addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'client'> & { client: string }) => Promise<Project>;
+  updateProject: (id: string, project: Partial<Omit<Project, 'client'>> & { client?: string }) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
   selectProject: (project: Project | null) => void;
 }
@@ -67,17 +68,17 @@ const projectReducer = (state: ProjectState, action: ProjectAction): ProjectStat
       return {
         ...state,
         projects: state.projects.map(project => 
-          project.id === action.payload.id ? action.payload : project
+          (project._id || project.id) === (action.payload._id || action.payload.id) ? action.payload : project
         ),
-        selectedProject: state.selectedProject?.id === action.payload.id 
+        selectedProject: (state.selectedProject?._id || state.selectedProject?.id) === (action.payload._id || action.payload.id)
           ? action.payload 
           : state.selectedProject
       };
     case 'DELETE_PROJECT':
       return {
         ...state,
-        projects: state.projects.filter(project => project.id !== action.payload),
-        selectedProject: state.selectedProject?.id === action.payload 
+        projects: state.projects.filter(project => (project._id || project.id) !== action.payload),
+        selectedProject: (state.selectedProject?._id || state.selectedProject?.id) === action.payload 
           ? null 
           : state.selectedProject
       };
@@ -99,6 +100,7 @@ const mockProjects: Project[] = [ ... ];
 // プロバイダーコンポーネント
 export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(projectReducer, initialState);
+  const { isAuthenticated } = useAuth(); // AuthContextから認証状態を取得
 
   // プロジェクト一覧取得 (API呼び出しに変更)
   const fetchProjects = async () => {
@@ -124,13 +126,13 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // プロジェクト追加 (エラーハンドリング改善)
-  const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'client'> & { client: string }) => {
     // optimistic update: 先にUIに反映 (任意)
     // const tempId = Date.now().toString(); // 仮ID
     // dispatch({ type: 'ADD_PROJECT', payload: { ...projectData, id: tempId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } });
 
     try {
-      const newProject = await projectService.createProject(projectData);
+      const newProject = await projectService.createProject(projectData as any); // APIはclient IDを期待
       // API成功後に正しいデータで状態を更新 (optimistic updateの場合は不要 or ID置換)
       dispatch({ type: 'ADD_PROJECT', payload: newProject });
       return newProject;
@@ -144,14 +146,14 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // プロジェクト更新 (エラーハンドリング改善)
-  const updateProject = async (id: string, projectData: Partial<Project>) => {
+  const updateProject = async (id: string, projectData: Partial<Omit<Project, 'client'>> & { client?: string }) => {
     // const originalProject = state.projects.find(p => p.id === id); // optimistic update用
     // if (originalProject) {
     //   dispatch({ type: 'UPDATE_PROJECT', payload: { ...originalProject, ...projectData } });
     // }
 
     try {
-      const updatedProject = await projectService.updateProject(id, projectData);
+      const updatedProject = await projectService.updateProject(id, projectData as any); // APIはclient IDを期待
       dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
       return updatedProject;
     } catch (error) {
@@ -186,11 +188,13 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     dispatch({ type: 'SELECT_PROJECT', payload: project });
   };
 
-  // 初回マウント時にプロジェクト一覧を取得
+  // 初回マウント時、または認証状態が変化したときにプロジェクト一覧を取得
   useEffect(() => {
-    fetchProjects();
+    if (isAuthenticated) {
+      fetchProjects();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 初回のみ実行
+  }, [isAuthenticated]);
 
   return (
     <ProjectContext.Provider

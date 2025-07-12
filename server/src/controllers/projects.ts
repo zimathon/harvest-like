@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import Project from '../models/Project.js';
+import Client from '../models/Client.js';
 import { AuthRequest } from '../types/index.js';
 
 // @desc    Get all projects
@@ -65,10 +66,36 @@ export const getProject = async (req: AuthRequest, res: Response): Promise<void>
 // @access  Private
 export const createProject = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const { client: clientId } = req.body;
+
+    // Validate client exists and belongs to user
+    if (clientId) {
+      const client = await Client.findById(clientId);
+      if (!client) {
+        res.status(400).json({
+          success: false,
+          error: 'Selected client not found.'
+        });
+        return;
+      }
+
+      // Check if client belongs to the user
+      if (client.user.toString() !== req.user?.id) {
+        res.status(401).json({
+          success: false,
+          error: 'Not authorized to use this client'
+        });
+        return;
+      }
+    }
+
     // Add user to req.body
     req.body.user = req.user?.id;
 
     const project = await Project.create(req.body);
+
+    // Populate client information in the response
+    await project.populate('client', 'name');
 
     res.status(201).json({
       success: true,
@@ -106,10 +133,32 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    // Validate client if provided
+    const { client: clientId } = req.body;
+    if (clientId) {
+      const client = await Client.findById(clientId);
+      if (!client) {
+        res.status(400).json({
+          success: false,
+          error: 'Selected client not found.'
+        });
+        return;
+      }
+
+      // Check if client belongs to the user
+      if (client.user.toString() !== req.user?.id) {
+        res.status(401).json({
+          success: false,
+          error: 'Not authorized to use this client'
+        });
+        return;
+      }
+    }
+
     project = await Project.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true
-    });
+    }).populate('client', 'name');
 
     res.status(200).json({
       success: true,

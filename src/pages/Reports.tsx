@@ -85,7 +85,7 @@ const Reports = () => {
                   <FormLabel>Team Member</FormLabel>
                   <Select defaultValue="all">
                     <option value="all">All Team Members</option>
-                    {users.map(user => (
+                    {Array.isArray(users) && users.map(user => (
                       <option key={user.id} value={user.id}>{user.name}</option>
                     ))}
                   </Select>

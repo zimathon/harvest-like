@@ -349,12 +349,12 @@ export const stopTimer = async (req: AuthRequest, res: Response): Promise<void> 
     
     const startTime = new Date(runningTimer.startTime);
     const endTime = new Date();
-    const durationInHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+    const durationInSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
     
     // Update timer
     runningTimer.isRunning = false;
     runningTimer.endTime = endTime;
-    runningTimer.duration = parseFloat(durationInHours.toFixed(2));
+    runningTimer.duration = durationInSeconds;
     
     await runningTimer.save();
 
