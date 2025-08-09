@@ -1,0 +1,16 @@
+# GCP プロジェクトID
+project_id = "your-gcp-project-id"
+
+# リージョン（us-central1 が無料枠に含まれる）
+region = "us-central1"
+
+# JWT シークレット（ランダムな文字列を生成してください）
+# 例: openssl rand -base64 32
+jwt_secret = "your-jwt-secret-here"
+
+# フロントエンドURL（CORS設定用）
+# Cloud Storage + CDN を使う場合
+frontend_url = "https://storage.googleapis.com/your-project-id-harvest-frontend"
+
+# カスタムドメインを使う場合（オプション）
+# frontend_domain = "harvest.yourdomain.com"

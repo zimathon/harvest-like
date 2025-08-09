@@ -70,6 +70,66 @@ Follow these instructions to set up and run the project locally.
 
     The frontend development server will typically run on `http://localhost:5173` (or as configured by Vite).
 
+## One-Command Local Startup (All Services)
+
+You can start multiple services with a single command.
+
+* macOS interactive script (recommended):
+
+  ```bash
+  ./scripts/quick-start-local.sh
+  ```
+
+  Menu options:
+  * 1) Start MongoDB version (current)
+  * 2) Start with Firestore emulator (testing)
+  * 3) Start both (for migration testing)
+  * 4) Stop all services
+  * 5) Check service status
+  * 6) Run Firestore tests only
+
+* Using npm scripts:
+
+  * Start frontend and backend together (ensure MongoDB is running separately):
+
+    ```bash
+    # Start MongoDB container (in another terminal)
+    cd server && docker-compose up -d mongo && cd ..
+
+    # Then, from project root
+    npm run dev:all
+    ```
+
+  * Start Firestore emulator + backend + frontend together:
+
+    ```bash
+    npm run dev:firestore
+    
+    # With automatic error monitoring and fixing agent (recommended)
+    npm run dev:monitored
+    ```
+
+  * Stop all related processes and free ports:
+
+    ```bash
+    npm run stop:all
+    ```
+
+  * Clear Firestore emulator data (when using dev:firestore):
+
+    ```bash
+    # From server directory
+    cd server && npm run firestore:clear
+    
+    # Or from project root with confirmation prompt
+    ./scripts/clear-firestore-data.sh
+    ```
+
+Service URLs:
+* Frontend: <http://localhost:5173>
+* Backend (MongoDB mode): <http://localhost:5001>
+* Firestore Emulator UI (when using dev:firestore): <http://localhost:4000>
+
 ## Creating an Admin User
 
 To create a new admin user, run the following command from the `server` directory:
@@ -81,8 +141,8 @@ npm run create-admin --name <your_name> --email <your_email> --password <your_pa
 Replace `<your_name>`, `<your_email>`, and `<your_password>` with the desired credentials.
 
 A default admin user has been created with the following credentials:
-- **Email**: `admin2@example.com`
-- **Password**: `password`
+* **Email**: `admin2@example.com`
+* **Password**: `password`
 
 ## Project Structure
 
