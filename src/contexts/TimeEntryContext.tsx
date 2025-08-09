@@ -28,7 +28,8 @@ type TimeEntryAction =
   | { type: 'UPDATE_ENTRY'; payload: TimeEntry }
   | { type: 'DELETE_ENTRY'; payload: string }
   | { type: 'START_TIMER'; payload: TimeEntry }
-  | { type: 'STOP_TIMER'; payload: TimeEntry };
+  | { type: 'STOP_TIMER'; payload: TimeEntry }
+  | { type: 'SET_ACTIVE_ENTRY'; payload: TimeEntry | null };
 
 // コンテキストの型定義
 interface TimeEntryContextType extends TimeEntryState {
@@ -36,7 +37,7 @@ interface TimeEntryContextType extends TimeEntryState {
   addTimeEntry: (entry: Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>) => Promise<TimeEntry>;
   updateTimeEntry: (id: string, entry: Partial<TimeEntry>) => Promise<TimeEntry>;
   deleteTimeEntry: (id: string) => Promise<void>;
-  startTimer: (projectId: string, taskId: string, notes?: string) => Promise<TimeEntry>;
+  startTimer: (projectId: string, taskId: string, notes?: string, isBillable?: boolean) => Promise<TimeEntry>;
   stopTimer: () => Promise<TimeEntry | null>;
 }
 
@@ -85,10 +86,17 @@ const timeEntryReducer = (state: TimeEntryState, action: TimeEntryAction): TimeE
           : state.activeEntry
       };
     case 'START_TIMER':
+      // Check if the entry already exists in timeEntries
+      const entryExists = state.timeEntries.some(entry => entry.id === action.payload.id);
       return {
         ...state,
         activeEntry: action.payload,
-        timeEntries: [...state.timeEntries, action.payload]
+        // Only add to timeEntries if it doesn't already exist
+        timeEntries: entryExists 
+          ? state.timeEntries.map(entry => 
+              entry.id === action.payload.id ? action.payload : entry
+            )
+          : [...state.timeEntries, action.payload]
       };
     case 'STOP_TIMER':
       return {
@@ -97,6 +105,11 @@ const timeEntryReducer = (state: TimeEntryState, action: TimeEntryAction): TimeE
         timeEntries: state.timeEntries.map(entry => 
           entry.id === action.payload.id ? action.payload : entry
         )
+      };
+    case 'SET_ACTIVE_ENTRY':
+      return {
+        ...state,
+        activeEntry: action.payload
       };
     default:
       return state;
@@ -122,7 +135,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
       
       dispatch({ type: 'FETCH_ENTRIES_SUCCESS', payload: entries });
       if (activeEntry) {
-        dispatch({ type: 'START_TIMER', payload: activeEntry });
+        // Use SET_ACTIVE_ENTRY instead of START_TIMER to avoid duplicating the entry
+        dispatch({ type: 'SET_ACTIVE_ENTRY', payload: activeEntry });
       }
     } catch (error) {
       dispatch({ 
@@ -170,7 +184,7 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // タイマー開始
-  const startTimer = async (projectId: string, taskId: string, notes?: string) => {
+  const startTimer = async (projectId: string, taskId: string, notes?: string, isBillable?: boolean) => {
     if (!user) throw new Error('User not authenticated');
     
     // 既存のアクティブなタイマーを停止
@@ -180,7 +194,7 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       // APIを使用してタイマーを開始
-      const newEntry = await timeEntryService.startTimer(projectId, taskId, notes);
+      const newEntry = await timeEntryService.startTimer(projectId, taskId, notes, isBillable);
       dispatch({ type: 'START_TIMER', payload: newEntry });
       return newEntry;
     } catch (error) {
