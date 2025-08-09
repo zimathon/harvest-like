@@ -59,7 +59,7 @@ const Projects = () => {
 
   const filteredProjects = projects.filter(project =>
     project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                project.client.name.toLowerCase().includes(searchTerm.toLowerCase()) // client.nameで検索 // client.nameで検索
+                (project.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) // clientNameで検索（Firestore版）
   )
 
   const handleArchive = async (id: string) => {
@@ -105,10 +105,11 @@ const Projects = () => {
         console.log('Debug: Setting form for editing project');
         console.log('Debug: selectedProject.client =', selectedProject.client);
         setProjectName(selectedProject.name)
-        // clientが文字列の場合とオブジェクトの場合を処理
-        const clientIdValue = typeof selectedProject.client === 'string' 
-          ? selectedProject.client 
-          : (selectedProject.client._id || selectedProject.client.id);
+        // Firestore版とMongoDB版の両方に対応
+        const clientIdValue = selectedProject.clientId || // Firestore版
+          (typeof selectedProject.client === 'string' 
+            ? selectedProject.client 
+            : (selectedProject.client?._id || selectedProject.client?.id)) || '';
         setClientId(clientIdValue)
         setDescription(selectedProject.description || '')
         setStatus(selectedProject.status)
@@ -201,7 +202,7 @@ const Projects = () => {
 
       const projectData = {
         name: projectName,
-        client: clientId, // Client IDを渡す
+        clientId: clientId, // Client IDを渡す (バックエンドはclientIdを期待)
         description,
         status,
         budget: isNaN(budgetNumber) ? 0 : budgetNumber,
@@ -310,8 +311,8 @@ const Projects = () => {
           </Thead>
           <Tbody>
             {filteredProjects.map((project) => {
-              // project.clientは既にClientオブジェクトになっているはず
-              const clientName = project.client.name || 'N/A'
+              // Firestore版ではclientNameが直接含まれている
+              const clientName = project.clientName || project.client?.name || 'N/A'
 
               return (
                 <Tr key={project._id || project.id}>

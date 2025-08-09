@@ -264,7 +264,11 @@ const Expenses = () => {
 
               return (
                 <Tr key={expense.id}>
-                  <Td>{new Date(expense.date).toLocaleDateString()}</Td>
+                  <Td>{expense.date && typeof expense.date === 'object' && '_seconds' in expense.date 
+                    ? new Date(expense.date._seconds * 1000).toLocaleDateString()
+                    : expense.date 
+                    ? new Date(expense.date).toLocaleDateString()
+                    : 'N/A'}</Td>
                   <Td fontWeight="medium">{expense.description}</Td>
                   <Td>{expense.category}</Td>
                   <Td>{projectName}</Td>

@@ -3,8 +3,18 @@ import { User } from '../types';
 
 // Login user
 export const login = async (email: string, password: string): Promise<{ user: User, token: string }> => {
-  const response = await api.post('/auth/login', { email, password });
-  return response.data;
+  console.log('🔐 Attempting login with:', { email, password: '***' });
+  console.log('📡 API endpoint:', api.defaults.baseURL + '/auth/login');
+  
+  try {
+    const response = await api.post('/auth/login', { email, password });
+    console.log('✅ Login response:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ Login error:', error.response?.data || error.message);
+    console.error('❌ Full error:', error);
+    throw error;
+  }
 };
 
 // Register user

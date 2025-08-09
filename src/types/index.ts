@@ -12,7 +12,9 @@ export interface User {
 export interface Project {
   id: string;
   name: string;
-  client: Client;
+  client?: Client; // MongoDB版で使用（オプショナル）
+  clientId?: string; // Firestore版で使用
+  clientName?: string; // Firestore版で使用（populated）
   description?: string;
   status: 'active' | 'completed' | 'archived' | 'on hold';
   budget?: number;
