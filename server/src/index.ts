@@ -13,6 +13,22 @@ import timeEntryRoutes from './routes/timeEntries.js';
 import userRoutes from './routes/users.js';
 import invoiceRoutes from './routes/invoices.js';
 
+// Import Firestore routes
+import authRoutesFirestore from './routes/auth.firestore.js';
+import usersRoutesFirestore from './routes/users.firestore.js';
+import projectsRoutesFirestore from './routes/projects.firestore.js';
+import timeEntriesRoutesFirestore from './routes/timeEntries.firestore.js';
+import clientsRoutesFirestore from './routes/clients.firestore.js';
+import expensesRoutesFirestore from './routes/expenses.firestore.js';
+import invoicesRoutesFirestore from './routes/invoices.firestore.js';
+import reportsRoutesFirestore from './routes/reports.firestore.js';
+
+// Initialize Firestore (for local development)
+import { initializeFirestore } from './config/firestore-local.js';
+if (process.env.NODE_ENV === 'development') {
+  initializeFirestore();
+}
+
 // Load environment variables (dotenv.config() は一度だけ呼び出す)
 dotenv.config(); // .env ファイルを読み込む
 
@@ -50,7 +66,7 @@ app.use(express.json());
 // app.use(cors()); // <<< 元の cors() 呼び出しは削除
 app.use(morgan('dev'));
 
-// Routes
+// Routes - MongoDB (v1)
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
@@ -58,6 +74,16 @@ app.use('/api/time-entries', timeEntryRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/invoices', invoiceRoutes);
+
+// Routes - Firestore (v2)
+app.use('/api/v2/auth', authRoutesFirestore);
+app.use('/api/v2/users', usersRoutesFirestore);
+app.use('/api/v2/projects', projectsRoutesFirestore);
+app.use('/api/v2/time-entries', timeEntriesRoutesFirestore);
+app.use('/api/v2/clients', clientsRoutesFirestore);
+app.use('/api/v2/expenses', expensesRoutesFirestore);
+app.use('/api/v2/invoices', invoicesRoutesFirestore);
+app.use('/api/v2/reports', reportsRoutesFirestore);
 
 // Error handler
 interface AppError extends Error {
