@@ -56,7 +56,9 @@ const Dashboard = () => {
     
     return timeEntries
       .filter(entry => {
-        const entryDate = new Date(entry.date);
+        const entryDate = entry.date && typeof entry.date === 'object' && '_seconds' in entry.date
+          ? new Date(entry.date._seconds * 1000)
+          : new Date(entry.date);
         return entryDate >= startOfWeek;
       })
       .reduce((total, entry) => total + entry.duration, 0);
@@ -69,7 +71,9 @@ const Dashboard = () => {
     
     return timeEntries
       .filter(entry => {
-        const entryDate = new Date(entry.date);
+        const entryDate = entry.date && typeof entry.date === 'object' && '_seconds' in entry.date
+          ? new Date(entry.date._seconds * 1000)
+          : new Date(entry.date);
         return entryDate >= startOfMonth;
       })
       .reduce((total, entry) => total + entry.duration, 0);
@@ -79,20 +83,36 @@ const Dashboard = () => {
   const unbilledAmount = useMemo(() => {
     return timeEntries
       .filter(entry => entry.isBillable)
-      .reduce((total, entry) => total + entry.duration * 100, 0);
+      .reduce((total, entry) => total + (entry.duration / 3600) * 100, 0);
   }, [timeEntries]);
   
   // 最近の時間エントリー（最新5件）
   const recentTimeEntries = useMemo(() => {
     return [...timeEntries]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort((a, b) => {
+        const dateA = a.updatedAt && typeof a.updatedAt === 'object' && '_seconds' in a.updatedAt
+          ? new Date(a.updatedAt._seconds * 1000)
+          : new Date(a.updatedAt);
+        const dateB = b.updatedAt && typeof b.updatedAt === 'object' && '_seconds' in b.updatedAt
+          ? new Date(b.updatedAt._seconds * 1000)
+          : new Date(b.updatedAt);
+        return dateB.getTime() - dateA.getTime();
+      })
       .slice(0, 5);
   }, [timeEntries]);
   
   // 最近の経費（最新5件）
   const recentExpenses = useMemo(() => {
     return [...expenses]
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort((a, b) => {
+        const dateA = a.updatedAt && typeof a.updatedAt === 'object' && '_seconds' in a.updatedAt
+          ? new Date(a.updatedAt._seconds * 1000)
+          : new Date(a.updatedAt);
+        const dateB = b.updatedAt && typeof b.updatedAt === 'object' && '_seconds' in b.updatedAt
+          ? new Date(b.updatedAt._seconds * 1000)
+          : new Date(b.updatedAt);
+        return dateB.getTime() - dateA.getTime();
+      })
       .slice(0, 5);
   }, [expenses]);
   
@@ -103,7 +123,7 @@ const Dashboard = () => {
     return projects.map(project => {
       // プロジェクトの時間を集計
       const projectHours = timeEntries
-        .filter(entry => entry.project.id === project.id)
+        .filter(entry => entry.project?.id === project.id)
         .reduce((total, entry) => total + entry.duration, 0);
       
       // 予算に対する進捗率を計算（仮定として、予算が時間または金額で設定されているものとする）
@@ -129,8 +149,10 @@ const Dashboard = () => {
     .slice(0, 5); // 上位5件を表示
   }, [projects, timeEntries]);
   
-  // 時間をフォーマット
-  const formatHours = (hours: number) => {
+  // 時間をフォーマット（秒から時間に変換）
+  const formatHours = (duration: number) => {
+    // duration is in seconds, convert to hours
+    const hours = duration / 3600;
     return hours.toFixed(1);
   };
   
@@ -143,8 +165,24 @@ const Dashboard = () => {
   };
   
   // 日付をフォーマット
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (dateValue: string | { _seconds: number; _nanoseconds: number }) => {
+    let date: Date;
+    
+    if (typeof dateValue === 'string') {
+      date = new Date(dateValue);
+    } else if (dateValue && typeof dateValue === 'object' && '_seconds' in dateValue) {
+      // Firestore Timestamp format
+      date = new Date(dateValue._seconds * 1000);
+    } else {
+      // Invalid date - return empty string or placeholder
+      return 'N/A';
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
@@ -233,7 +271,7 @@ const Dashboard = () => {
                   {recentTimeEntries.map(entry => (
                     <Tr key={entry.id}>
                       <Td>{formatDate(entry.date)}</Td>
-                      <Td>{entry.project.name}</Td>
+                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
                       <Td>{formatHours(entry.duration)}</Td>
                       <Td>
                         {entry.isRunning ? (
@@ -300,7 +338,7 @@ const Dashboard = () => {
                       <Td>{formatDate(expense.date)}</Td>
                       <Td>{expense.category}</Td>
                       <Td>{formatAmount(expense.amount)}</Td>
-                      <Td>{expense.project.name}</Td>
+                      <Td>{expense.project?.name || 'Unknown Project'}</Td>
                     </Tr>
                   ))}
                 </Tbody>
