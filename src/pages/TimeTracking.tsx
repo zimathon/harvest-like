@@ -28,7 +28,8 @@ import {
   useToast,
   Spinner,
   Badge,
-  Flex
+  Flex,
+  ButtonGroup
 } from '@chakra-ui/react';
 import { MdEdit, MdDelete, MdPlayArrow, MdStop } from 'react-icons/md';
 import { useTimeEntries } from '../contexts/TimeEntryContext';
@@ -51,6 +52,8 @@ const TimeTracking = () => {
   const [tabIndex, setTabIndex] = useState<number>(0);
   const [selectedTimeEntry, setSelectedTimeEntry] = useState<TimeEntry | null>(null); // 編集用
   const [currentTime, setCurrentTime] = useState<Date>(new Date()); // リアルタイム時間表示用
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const entriesPerPage = 20;
   
   const toast = useToast();
   
@@ -117,11 +120,10 @@ const TimeTracking = () => {
 
   useEffect(() => {
     if (selectedTimeEntry) {
-      console.log('Debug: Setting form for editing time entry =', selectedTimeEntry);
       setDate(selectedTimeEntry.date);
       
       // プロジェクトIDを設定
-      const projectId = selectedTimeEntry.project._id || selectedTimeEntry.project.id;
+      const projectId = selectedTimeEntry.project?._id || selectedTimeEntry.project?.id;
       setSelectedProjectId(projectId);
       
       // プロジェクトのタスクを取得してタスクIDを設定
@@ -136,21 +138,71 @@ const TimeTracking = () => {
         }
       }
       
-      setDuration(formatDuration(selectedTimeEntry.duration));
+      setDuration(formatDuration(selectedTimeEntry.duration || selectedTimeEntry.hours, selectedTimeEntry.hours !== undefined));
       setNotes(selectedTimeEntry.notes || '');
     }
   }, [selectedTimeEntry, projects]);
 
   // Helper function to format duration
-  const formatDuration = (seconds: number) => {
+  const formatDuration = (value: number | undefined, isHours: boolean = false) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '0h 0m';
+    }
+    
+    const seconds = isHours ? value * 3600 : value;
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${hours}h ${minutes}m`;
   };
 
+  // Helper function to format entry time
+  const formatEntryTime = (entry: TimeEntry) => {
+    // 開始時刻がある場合（タイマー実行中）
+    if (entry.startTime) {
+      let startDate: Date;
+      if (typeof entry.startTime === 'object' && '_seconds' in entry.startTime) {
+        startDate = new Date(entry.startTime._seconds * 1000);
+      } else {
+        startDate = new Date(entry.startTime);
+      }
+      return startDate.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    }
+    
+    // 作成時刻を表示
+    if (entry.createdAt) {
+      let createdDate: Date;
+      if (typeof entry.createdAt === 'object' && '_seconds' in entry.createdAt) {
+        createdDate = new Date(entry.createdAt._seconds * 1000);
+      } else {
+        createdDate = new Date(entry.createdAt);
+      }
+      return createdDate.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      });
+    }
+    
+    return '-';
+  };
+
   // タイマーの経過時間を計算
-  const getElapsedTime = (startTime: string | Date) => {
-    const start = new Date(startTime);
+  const getElapsedTime = (startTime: string | Date | { _seconds: number; _nanoseconds: number }) => {
+    let start: Date;
+    
+    if (typeof startTime === 'string') {
+      start = new Date(startTime);
+    } else if (startTime && typeof startTime === 'object' && '_seconds' in startTime) {
+      // Firestore Timestamp format
+      start = new Date(startTime._seconds * 1000);
+    } else {
+      start = new Date(startTime);
+    }
+    
     const now = currentTime;
     const diffMs = now.getTime() - start.getTime();
     const diffSeconds = Math.floor(diffMs / 1000);
@@ -160,9 +212,42 @@ const TimeTracking = () => {
   // Filter time entries for today
   const getTodayEntries = () => {
     const today = new Date().toISOString().split('T')[0];
-    return timeEntries.filter(entry => {
-      const entryDate = typeof entry.date === 'string' ? entry.date : new Date(entry.date).toISOString().split('T')[0];
+    const todayEntries = timeEntries.filter(entry => {
+      let entryDate: string;
+      
+      if (typeof entry.date === 'string') {
+        // If it's already a string date, use it directly or parse if needed
+        entryDate = entry.date.includes('T') ? entry.date.split('T')[0] : entry.date;
+      } else if (entry.date && typeof entry.date === 'object' && '_seconds' in entry.date) {
+        // Firestore timestamp format
+        entryDate = new Date(entry.date._seconds * 1000).toISOString().split('T')[0];
+      } else {
+        // Other date formats or invalid dates
+        return false;
+      }
+      
       return entryDate === today;
+    });
+    
+    // Sort by creation time (newest first)
+    return todayEntries.sort((a, b) => {
+      const getTime = (entry: TimeEntry) => {
+        if (entry.startTime) {
+          if (typeof entry.startTime === 'object' && '_seconds' in entry.startTime) {
+            return entry.startTime._seconds * 1000;
+          }
+          return new Date(entry.startTime).getTime();
+        }
+        if (entry.createdAt) {
+          if (typeof entry.createdAt === 'object' && '_seconds' in entry.createdAt) {
+            return entry.createdAt._seconds * 1000;
+          }
+          return new Date(entry.createdAt).getTime();
+        }
+        return 0;
+      };
+      
+      return getTime(b) - getTime(a); // 新しい順（降順）
     });
   };
 
@@ -172,17 +257,29 @@ const TimeTracking = () => {
     const dayOfWeek = today.getDay();
     const firstDayOfWeek = new Date(today);
     firstDayOfWeek.setDate(today.getDate() - dayOfWeek);
+    firstDayOfWeek.setHours(0, 0, 0, 0);
     const lastDayOfWeek = new Date(today);
     lastDayOfWeek.setDate(today.getDate() - dayOfWeek + 6);
+    lastDayOfWeek.setHours(23, 59, 59, 999);
 
     return timeEntries.filter(entry => {
-      const entryDate = new Date(entry.date);
+      let entryDate: Date;
+      
+      if (typeof entry.date === 'string') {
+        entryDate = new Date(entry.date);
+      } else if (entry.date && typeof entry.date === 'object' && '_seconds' in entry.date) {
+        entryDate = new Date(entry.date._seconds * 1000);
+      } else {
+        return false;
+      }
+      
+      // Check if date is valid
+      if (isNaN(entryDate.getTime())) {
+        return false;
+      }
+      
       entryDate.setHours(0, 0, 0, 0);
-      const firstDay = new Date(firstDayOfWeek);
-      firstDay.setHours(0, 0, 0, 0);
-      const lastDay = new Date(lastDayOfWeek);
-      lastDay.setHours(23, 59, 59, 999);
-      return entryDate >= firstDay && entryDate <= lastDay;
+      return entryDate >= firstDayOfWeek && entryDate <= lastDayOfWeek;
     });
   };
 
@@ -190,25 +287,33 @@ const TimeTracking = () => {
   const getMonthEntries = () => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    firstDayOfMonth.setHours(0, 0, 0, 0);
     const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    lastDayOfMonth.setHours(23, 59, 59, 999);
 
     return timeEntries.filter(entry => {
-      const entryDate = new Date(entry.date);
+      let entryDate: Date;
+      
+      if (typeof entry.date === 'string') {
+        entryDate = new Date(entry.date);
+      } else if (entry.date && typeof entry.date === 'object' && '_seconds' in entry.date) {
+        entryDate = new Date(entry.date._seconds * 1000);
+      } else {
+        return false;
+      }
+      
+      // Check if date is valid
+      if (isNaN(entryDate.getTime())) {
+        return false;
+      }
+      
       entryDate.setHours(0, 0, 0, 0);
-      const firstDay = new Date(firstDayOfMonth);
-      firstDay.setHours(0, 0, 0, 0);
-      const lastDay = new Date(lastDayOfMonth);
-      lastDay.setHours(23, 59, 59, 999);
-      return entryDate >= firstDay && entryDate <= lastDay;
+      return entryDate >= firstDayOfMonth && entryDate <= lastDayOfMonth;
     });
   };
 
   // Save/Update Time Entry
   const handleSaveTimeEntry = async () => {
-    console.log('Debug: handleSaveTimeEntry called');
-    console.log('Debug: selectedProjectId =', selectedProjectId);
-    console.log('Debug: selectedTaskId =', selectedTaskId);
-    console.log('Debug: duration =', duration);
     
     if (!selectedProjectId || !selectedTaskId || !duration) {
       toast({
@@ -220,8 +325,6 @@ const TimeTracking = () => {
       });
       return;
     }
-
-    console.log('Debug: duration input =', duration);
     
     // より堅牢な時間解析
     let totalSeconds = 0;
@@ -243,8 +346,6 @@ const TimeTracking = () => {
       totalSeconds = minutes * 60;
     }
     
-    console.log('Debug: totalSeconds =', totalSeconds);
-    
     // durationが0または無効な場合のチェック
     if (totalSeconds <= 0) {
       toast({
@@ -260,11 +361,6 @@ const TimeTracking = () => {
     const selectedProject = projects.find(p => (p._id || p.id) === selectedProjectId);
     const selectedTask = tasks.find(t => (t._id || t.id) === selectedTaskId);
 
-    console.log('Debug: selectedProject =', selectedProject);
-    console.log('Debug: selectedTask =', selectedTask);
-    console.log('Debug: projects =', projects);
-    console.log('Debug: tasks =', tasks);
-
     if (!selectedProject || !selectedTask) {
       toast({
         title: 'Error',
@@ -278,22 +374,20 @@ const TimeTracking = () => {
 
     const timeEntryData = {
       userId: user?.id || '',
-      project: selectedProject._id || selectedProject.id, // プロジェクトIDのみ送信
+      projectId: selectedProject._id || selectedProject.id, // プロジェクトIDのみ送信
       task: selectedTask.name, // タスク名のみ送信
       date: date,
-      duration: totalSeconds,
-      notes: notes,
+      hours: totalSeconds / 3600, // Convert seconds to hours for backend
+      description: notes,
       isBillable: selectedTask.isBillable,
       isRunning: false,
     };
 
-    console.log('Debug: timeEntryData =', timeEntryData);
-    console.log('Debug: user =', user);
-
     try {
       if (selectedTimeEntry) {
-        console.log('Debug: Updating existing time entry');
         await updateTimeEntry(selectedTimeEntry._id || selectedTimeEntry.id, timeEntryData);
+        // 更新後にリストを更新
+        await fetchTimeEntries();
         toast({
           title: 'Success',
           description: 'Time entry updated successfully',
@@ -302,8 +396,9 @@ const TimeTracking = () => {
           isClosable: true
         });
       } else {
-        console.log('Debug: Creating new time entry');
         await addTimeEntry(timeEntryData);
+        // 追加後にリストを更新
+        await fetchTimeEntries();
         toast({
           title: 'Success',
           description: 'Time entry added successfully',
@@ -321,7 +416,6 @@ const TimeTracking = () => {
       setDate(new Date().toISOString().split('T')[0]);
 
     } catch (error) {
-      console.error('Debug: Error saving time entry:', error);
       toast({
         title: 'Error',
         description: 'Failed to save time entry',
@@ -357,7 +451,7 @@ const TimeTracking = () => {
         });
         return;
       }
-      await startTimer(selectedProjectId, selectedTask.name, notes);
+      await startTimer(selectedProjectId, selectedTask.name, notes, selectedTask.isBillable);
       toast({
         title: 'Timer Started',
         description: 'Your timer is now running',
@@ -404,6 +498,8 @@ const TimeTracking = () => {
   const handleDeleteEntry = async (id: string) => {
     try {
       await deleteTimeEntry(id);
+      // 削除後にリストを更新
+      await fetchTimeEntries();
       toast({
         title: 'Deleted',
         description: 'Time entry deleted successfully',
@@ -431,8 +527,9 @@ const TimeTracking = () => {
   const handleCancelEdit = () => {
     setSelectedTimeEntry(null);
     setDate(new Date().toISOString().split('T')[0]);
-    setSelectedProjectId('');
-    setSelectedTaskId('');
+    // プロジェクトとタスクは保存された値に戻す
+    setSelectedProjectId(localStorage.getItem('timeTracking_selectedProjectId') || '');
+    setSelectedTaskId(localStorage.getItem('timeTracking_selectedTaskId') || '');
     setDuration('');
     setNotes('');
   };
@@ -448,7 +545,7 @@ const TimeTracking = () => {
               <Box p={3} bg="blue.50" borderRadius="md" border="1px" borderColor="blue.200">
                 <Flex justify="space-between" align="center">
                   <Text fontWeight="bold" color="blue.600">
-                    Editing Time Entry: {selectedTimeEntry.project.name} - {selectedTimeEntry.task}
+                    Editing Time Entry: {selectedTimeEntry.project?.name || 'Unknown Project'} - {selectedTimeEntry.task}
                   </Text>
                   <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
                     Cancel Edit
@@ -554,7 +651,7 @@ const TimeTracking = () => {
                 <Flex justify="space-between" align="center">
                   <Box>
                     <Text fontWeight="bold">Timer Running</Text>
-                    <Text>{activeEntry.project.name} - {activeEntry.task}</Text>
+                    <Text>{activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {activeEntry.task}</Text>
                     <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
                     {activeEntry.startTime && (
                       <Text fontSize="lg" fontWeight="bold" color="green.600">
@@ -572,11 +669,15 @@ const TimeTracking = () => {
         </CardBody>
       </Card>
       
-      <Tabs variant="enclosed" mb={8} index={tabIndex} onChange={setTabIndex}>
+      <Tabs variant="enclosed" mb={8} index={tabIndex} onChange={(index) => {
+        setTabIndex(index);
+        setCurrentPage(1); // Reset page when switching tabs
+      }}>
         <TabList>
           <Tab>Day</Tab>
           <Tab>Week</Tab>
           <Tab>Month</Tab>
+          <Tab>All Entries</Tab>
         </TabList>
         
         <TabPanels>
@@ -589,6 +690,7 @@ const TimeTracking = () => {
               <Table variant="simple">
                 <Thead>
                   <Tr>
+                    <Th>Time</Th>
                     <Th>Project</Th>
                     <Th>Task</Th>
                     <Th>Notes</Th>
@@ -599,10 +701,11 @@ const TimeTracking = () => {
                 <Tbody>
                   {getTodayEntries().map(entry => (
                     <Tr key={entry._id || entry.id}>
-                      <Td>{entry.project.name}</Td>
+                      <Td>{formatEntryTime(entry)}</Td>
+                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
                       <Td>{entry.task}</Td>
                       <Td>{entry.notes || '-'}</Td>
-                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration)}</Td>
+                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -652,10 +755,10 @@ const TimeTracking = () => {
                   {getWeekEntries().map(entry => (
                     <Tr key={entry._id || entry.id}>
                       <Td>{entry.date}</Td>
-                      <Td>{entry.project.name}</Td>
+                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
                       <Td>{entry.task}</Td>
                       <Td>{entry.notes || '-'}</Td>
-                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration)}</Td>
+                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -705,10 +808,10 @@ const TimeTracking = () => {
                   {getMonthEntries().map(entry => (
                     <Tr key={entry._id || entry.id}>
                       <Td>{entry.date}</Td>
-                      <Td>{entry.project.name}</Td>
+                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
                       <Td>{entry.task}</Td>
                       <Td>{entry.notes || '-'}</Td>
-                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration)}</Td>
+                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -734,6 +837,106 @@ const TimeTracking = () => {
               </Table>
             ) : (
               <Text p={4}>No entries recorded this month.</Text>
+            )}
+          </TabPanel>
+          
+          <TabPanel>
+            {isLoading ? (
+              <Flex justify="center" p={10}>
+                <Spinner />
+              </Flex>
+            ) : timeEntries.length > 0 ? (
+              <>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Date</Th>
+                      <Th>Project</Th>
+                      <Th>Task</Th>
+                      <Th>Notes</Th>
+                      <Th>Duration</Th>
+                      <Th>Actions</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {timeEntries
+                      .sort((a, b) => {
+                        const dateA = a.date && typeof a.date === 'object' && '_seconds' in a.date
+                          ? new Date(a.date._seconds * 1000)
+                          : new Date(a.date);
+                        const dateB = b.date && typeof b.date === 'object' && '_seconds' in b.date
+                          ? new Date(b.date._seconds * 1000)
+                          : new Date(b.date);
+                        return dateB.getTime() - dateA.getTime();
+                      })
+                      .slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage)
+                      .map(entry => (
+                      <Tr key={entry._id || entry.id}>
+                        <Td>{entry.date}</Td>
+                        <Td>{entry.project?.name || 'Unknown Project'}</Td>
+                        <Td>{entry.task}</Td>
+                        <Td>{entry.notes || '-'}</Td>
+                        <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <IconButton
+                              aria-label="Edit"
+                              icon={<MdEdit />}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditEntry(entry)}
+                            />
+                            <IconButton
+                              aria-label="Delete"
+                              icon={<MdDelete />}
+                              size="sm"
+                              variant="ghost"
+                              colorScheme="red"
+                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
+                            />
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+                
+                {timeEntries.length > entriesPerPage && (
+                  <Flex justify="center" mt={4}>
+                    <ButtonGroup size="sm" spacing={2}>
+                      <Button
+                        onClick={() => setCurrentPage(1)}
+                        isDisabled={currentPage === 1}
+                      >
+                        First
+                      </Button>
+                      <Button
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        isDisabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <Text alignSelf="center" px={4}>
+                        Page {currentPage} of {Math.ceil(timeEntries.length / entriesPerPage)}
+                      </Text>
+                      <Button
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        isDisabled={currentPage === Math.ceil(timeEntries.length / entriesPerPage)}
+                      >
+                        Next
+                      </Button>
+                      <Button
+                        onClick={() => setCurrentPage(Math.ceil(timeEntries.length / entriesPerPage))}
+                        isDisabled={currentPage === Math.ceil(timeEntries.length / entriesPerPage)}
+                      >
+                        Last
+                      </Button>
+                    </ButtonGroup>
+                  </Flex>
+                )}
+              </>
+            ) : (
+              <Text p={4}>No time entries recorded.</Text>
             )}
           </TabPanel>
         </TabPanels>
