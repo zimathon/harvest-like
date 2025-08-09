@@ -46,12 +46,13 @@ export const deleteTimeEntry = async (id: string): Promise<void> => {
 };
 
 // Start timer
-export const startTimer = async (projectId: string, taskName: string, notes?: string): Promise<TimeEntry> => {
+export const startTimer = async (projectId: string, taskName: string, notes?: string, isBillable?: boolean): Promise<TimeEntry> => {
   const response = await api.post('/time-entries/timer/start', {
-    project: projectId,
+    projectId: projectId,  // Firestore版は projectId を期待
     task: taskName,
     date: new Date().toISOString().split('T')[0],
-    notes
+    notes,
+    isBillable: isBillable !== undefined ? isBillable : true
   });
   return response.data.data;
 };
