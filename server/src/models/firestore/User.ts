@@ -1,0 +1,126 @@
+import { Firestore, Timestamp } from '@google-cloud/firestore';
+import bcrypt from 'bcryptjs';
+import { getFirestore } from '../../config/firestore-local.js';
+import { IUser } from '../../types/firestore.js';
+import { collections } from '../../config/firestore-local.js';
+
+export interface UserCreateData extends Omit<IUser, 'id' | 'createdAt' | 'updatedAt'> {
+  password: string;
+}
+
+export interface UserMigrationData extends Omit<IUser, 'id' | 'createdAt' | 'updatedAt'> {
+  password: string;
+  skipHash?: boolean;
+}
+
+export class UserModel {
+  private db: any;
+  private collection: any;
+  
+  constructor() {
+    this.db = getFirestore();
+    this.collection = this.db.collection(collections.users);
+  }
+
+  async create(userData: UserCreateData | UserMigrationData): Promise<IUser> {
+    const now = Timestamp.now();
+    const hashedPassword = 'skipHash' in userData && userData.skipHash 
+      ? userData.password 
+      : await bcrypt.hash(userData.password, 10);
+    
+    const user: Omit<IUser, 'id'> = {
+      ...userData,
+      password: hashedPassword,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const docRef = await this.collection.add(user);
+    return {
+      id: docRef.id,
+      ...user
+    };
+  }
+
+  async findById(id: string): Promise<IUser | null> {
+    const doc = await this.collection.doc(id).get();
+    if (!doc.exists) {
+      return null;
+    }
+    return {
+      id: doc.id,
+      ...doc.data()
+    } as IUser;
+  }
+
+  async findByEmail(email: string): Promise<IUser | null> {
+    const snapshot = await this.collection.where('email', '==', email).limit(1).get();
+    if (snapshot.empty) {
+      return null;
+    }
+    const doc = snapshot.docs[0];
+    return {
+      id: doc.id,
+      ...doc.data()
+    } as IUser;
+  }
+
+  async update(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
+    const docRef = this.collection.doc(id);
+    const doc = await docRef.get();
+    
+    if (!doc.exists) {
+      return null;
+    }
+
+    const updates = {
+      ...updateData,
+      updatedAt: Timestamp.now()
+    };
+
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
+
+    await docRef.update(updates);
+    
+    const updatedDoc = await docRef.get();
+    return {
+      id: updatedDoc.id,
+      ...updatedDoc.data()
+    } as IUser;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    try {
+      await this.collection.doc(id).delete();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async list(filters?: { role?: string; isActive?: boolean }): Promise<IUser[]> {
+    let query = this.collection as any;
+    
+    if (filters?.role) {
+      query = query.where('role', '==', filters.role);
+    }
+    
+    if (filters?.isActive !== undefined) {
+      query = query.where('isActive', '==', filters.isActive);
+    }
+    
+    const snapshot = await query.get();
+    return snapshot.docs.map((doc: any) => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  }
+
+  async comparePassword(user: IUser, candidatePassword: string): Promise<boolean> {
+    return bcrypt.compare(candidatePassword, user.password);
+  }
+}
+
+export default new UserModel();
