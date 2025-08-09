@@ -5,10 +5,10 @@
 - paragraph: Sign in to your account
 - group:
   - text: Email
-  - textbox "Email"
+  - textbox "Email": invalid@example.com
 - group:
   - text: Password
-  - textbox "Password"
+  - textbox "Password": wrongpassword
   - button:
     - img
 - button "Sign In"
@@ -17,6 +17,10 @@
 - region "Notifications-top-left"
 - region "Notifications-top-right"
 - region "Notifications-bottom-left"
-- region "Notifications-bottom"
+- region "Notifications-bottom":
+  - status:
+    - img
+    - text: Login failed Invalid email or password
+    - button "Close"
 - region "Notifications-bottom-right"
 ```

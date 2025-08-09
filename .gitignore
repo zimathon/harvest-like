@@ -67,3 +67,20 @@ Thumbs.db
 .AppleDouble
 
 .specstory/*
+
+# Deployment files
+.env.production
+deploy/terraform/terraform.tfvars
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.*
+deploy/terraform/.terraform.lock.hcl
+
+# GCP credentials
+*-key.json
+credentials.json
+
+# Firestore emulator data
+server/.firestore-data/
+**/firestore-export-*
+**/.firestore/
