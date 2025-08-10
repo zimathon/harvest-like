@@ -30,7 +30,7 @@ export const getSummaryReport = async (req: AuthRequestFirestore, res: Response)
     const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
     
     // Get billable hours and revenue
-    const billableEntries = timeEntries.filter(entry => entry.billable);
+    const billableEntries = timeEntries.filter(entry => entry.isBillable);
     const billableHours = billableEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
     
     // Calculate revenue from billable entries
