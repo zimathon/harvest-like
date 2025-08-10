@@ -1,0 +1,245 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  PROJECT_ID: harvest-like-prod
+  REGION: asia-northeast1
+  REPOSITORY: harvest-backend
+  SERVICE_NAME: harvest-backend
+  BUCKET_NAME: harvest-like-prod-frontend
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Set environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/production" ]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+          else
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          fi
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd server && npm ci
+
+      - name: Run frontend tests
+        run: npm test --if-present
+
+      - name: Run backend tests
+        run: cd server && npm test --if-present
+
+      - name: Run E2E tests
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e --if-present
+        continue-on-error: true # Don't fail deployment if E2E tests fail
+
+  deploy-backend:
+    name: Deploy Backend to Cloud Run
+    runs-on: ubuntu-latest
+    needs: [setup, test]
+    environment: ${{ needs.setup.outputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use gcloud as credential helper
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build Docker image
+        run: |
+          cd server
+          docker build \
+            -f Dockerfile.production \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:latest \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --set-env-vars "NODE_ENV=${{ needs.setup.outputs.environment }}" \
+            --set-env-vars "PORT=8080" \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }}" \
+            --set-secrets "JWT_SECRET=jwt-secret:latest" \
+            --memory 512Mi \
+            --cpu 1 \
+            --timeout 60 \
+            --concurrency 80 \
+            --max-instances 10 \
+            --min-instances ${{ needs.setup.outputs.environment == 'production' && '1' || '0' }}
+
+      - name: Get Service URL
+        id: get-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "Backend deployed to: $SERVICE_URL"
+
+      - name: Health Check
+        run: |
+          sleep 10
+          curl -f ${{ steps.get-url.outputs.service_url }}/health || exit 1
+
+  deploy-frontend:
+    name: Deploy Frontend to Cloud Storage
+    runs-on: ubuntu-latest
+    needs: [setup, test, deploy-backend]
+    environment: ${{ needs.setup.outputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get Backend URL
+        id: get-backend-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "backend_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+      - name: Build Frontend
+        env:
+          VITE_API_URL: ${{ steps.get-backend-url.outputs.backend_url }}/api/v2
+          VITE_ENV: ${{ needs.setup.outputs.environment }}
+        run: npm run build
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Upload to Cloud Storage
+        run: |
+          # Upload HTML files with no-cache headers
+          gsutil -m -h "Cache-Control:no-cache, no-store, must-revalidate" \
+            cp -r dist/*.html gs://${{ env.BUCKET_NAME }}/
+          
+          # Upload JS/CSS with long cache
+          gsutil -m -h "Cache-Control:public, max-age=31536000, immutable" \
+            cp -r dist/assets/* gs://${{ env.BUCKET_NAME }}/assets/
+          
+          # Upload other static files
+          gsutil -m cp -r dist/* gs://${{ env.BUCKET_NAME }}/ 2>/dev/null || true
+
+      - name: Invalidate CDN Cache
+        run: |
+          if gcloud compute url-maps list --format="value(name)" | grep -q "harvest-frontend-lb"; then
+            gcloud compute url-maps invalidate-cdn-cache harvest-frontend-lb \
+              --path "/*" \
+              --async
+          fi
+        continue-on-error: true
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+    steps:
+      - name: Send Slack Notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Deployment to ${{ needs.setup.outputs.environment }} ${{ job.status == 'success' && '✅ succeeded' || '❌ failed' }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Create Deployment Record
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: '${{ needs.setup.outputs.environment }}',
+              auto_merge: false,
+              required_contexts: [],
+              payload: {
+                backend_url: '${{ needs.deploy-backend.outputs.service_url }}',
+                frontend_url: 'https://storage.googleapis.com/${{ env.BUCKET_NAME }}'
+              }
+            });

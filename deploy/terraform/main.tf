@@ -1,3 +1,6 @@
+# Main Terraform configuration for Harvest Like on GCP
+# Optimized for FREE TIER usage (¥0 ~ ¥1,000/month)
+
 terraform {
   required_version = ">= 1.0"
   
@@ -19,15 +22,24 @@ provider "google" {
   region  = var.region
 }
 
-# API有効化
+# API有効化（無料枠モードでは最小限のAPIのみ）
 resource "google_project_service" "required_apis" {
-  for_each = toset([
-    "cloudrun.googleapis.com",
-    "cloudbuild.googleapis.com",
-    "firestore.googleapis.com",
-    "secretmanager.googleapis.com",
-    "artifactregistry.googleapis.com",
-  ])
+  for_each = toset(
+    var.enable_free_tier ? [
+      "cloudrun.googleapis.com",           # Cloud Run
+      "firestore.googleapis.com",          # Firestore
+      "artifactregistry.googleapis.com",   # Docker registry
+      "cloudscheduler.googleapis.com",     # Scheduler (3 jobs free)
+      "cloudbilling.googleapis.com",       # Budget alerts
+    ] : [
+      "cloudrun.googleapis.com",
+      "cloudbuild.googleapis.com",
+      "firestore.googleapis.com",
+      "secretmanager.googleapis.com",
+      "artifactregistry.googleapis.com",
+      "compute.googleapis.com",
+    ]
+  )
   
   service = each.value
   disable_on_destroy = false
@@ -43,106 +55,16 @@ resource "google_artifact_registry_repository" "backend" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Firestore データベース
+# Firestore データベース（無料枠: 単一リージョン）
 resource "google_firestore_database" "database" {
   name        = "(default)"
-  location_id = var.region
+  location_id = var.enable_free_tier ? var.region : "asia-northeast1"
   type        = "FIRESTORE_NATIVE"
   
-  depends_on = [google_project_service.required_apis]
-}
-
-# Secret Manager - JWT Secret
-resource "google_secret_manager_secret" "jwt_secret" {
-  secret_id = "jwt-secret"
-  
-  replication {
-    auto {}
-  }
+  # 無料枠モードでは同時実行制限を設定
+  concurrency_mode = var.enable_free_tier ? "OPTIMISTIC" : "PESSIMISTIC"
   
   depends_on = [google_project_service.required_apis]
-}
-
-resource "google_secret_manager_secret_version" "jwt_secret_version" {
-  secret = google_secret_manager_secret.jwt_secret.id
-  secret_data = var.jwt_secret
-}
-
-# Cloud Run サービス
-resource "google_cloud_run_service" "backend" {
-  name     = "harvest-backend"
-  location = var.region
-  
-  template {
-    spec {
-      containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/harvest-backend/api:latest"
-        
-        ports {
-          container_port = 8080
-        }
-        
-        env {
-          name  = "NODE_ENV"
-          value = "production"
-        }
-        
-        env {
-          name  = "GOOGLE_CLOUD_PROJECT"
-          value = var.project_id
-        }
-        
-        env {
-          name  = "CORS_ORIGIN"
-          value = var.frontend_url
-        }
-        
-        env {
-          name = "JWT_SECRET"
-          value_from {
-            secret_key_ref {
-              name = google_secret_manager_secret.jwt_secret.secret_id
-              key  = "latest"
-            }
-          }
-        }
-        
-        resources {
-          limits = {
-            cpu    = "1"
-            memory = "512Mi"
-          }
-        }
-      }
-      
-      service_account_name = google_service_account.backend.email
-    }
-    
-    metadata {
-      annotations = {
-        "autoscaling.knative.dev/maxScale" = "10"
-        "autoscaling.knative.dev/minScale" = "0"
-      }
-    }
-  }
-  
-  traffic {
-    percent         = 100
-    latest_revision = true
-  }
-  
-  depends_on = [
-    google_project_service.required_apis,
-    google_secret_manager_secret_version.jwt_secret_version
-  ]
-}
-
-# Cloud Run を公開
-resource "google_cloud_run_service_iam_member" "public" {
-  service  = google_cloud_run_service.backend.name
-  location = google_cloud_run_service.backend.location
-  role     = "roles/run.invoker"
-  member   = "allUsers"
 }
 
 # サービスアカウント
@@ -158,15 +80,180 @@ resource "google_project_iam_member" "firestore_user" {
   member  = "serviceAccount:${google_service_account.backend.email}"
 }
 
-# Secret Manager アクセス権限
+# Secret Manager - JWT Secret（無料枠では環境変数を使用）
+resource "google_secret_manager_secret" "jwt_secret" {
+  count     = var.enable_free_tier ? 0 : 1
+  secret_id = "jwt-secret"
+  
+  replication {
+    auto {}
+  }
+  
+  depends_on = [google_project_service.required_apis]
+}
+
+resource "google_secret_manager_secret_version" "jwt_secret_version" {
+  count       = var.enable_free_tier ? 0 : 1
+  secret      = google_secret_manager_secret.jwt_secret[0].id
+  secret_data = var.jwt_secret
+}
+
+# Secret Manager アクセス権限（無料枠では不要）
 resource "google_project_iam_member" "secret_accessor" {
+  count   = var.enable_free_tier ? 0 : 1
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
   member  = "serviceAccount:${google_service_account.backend.email}"
 }
 
-# Cloud Storage バケット（フロントエンド用）
+# Cloud Run サービス（無料枠最適化）
+resource "google_cloud_run_service" "backend" {
+  name     = "harvest-backend"
+  location = var.region
+  
+  template {
+    spec {
+      containers {
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/harvest-backend/api:latest"
+        
+        ports {
+          container_port = 8080
+        }
+        
+        # 環境変数
+        env {
+          name  = "NODE_ENV"
+          value = var.environment
+        }
+        
+        env {
+          name  = "GOOGLE_CLOUD_PROJECT"
+          value = var.project_id
+        }
+        
+        env {
+          name  = "CORS_ORIGIN"
+          value = var.frontend_url
+        }
+        
+        # 無料枠モードではJWT_SECRETを環境変数として設定
+        dynamic "env" {
+          for_each = var.enable_free_tier ? [1] : []
+          content {
+            name  = "JWT_SECRET"
+            value = var.jwt_secret
+          }
+        }
+        
+        # 通常モードではSecret Managerを使用
+        dynamic "env" {
+          for_each = var.enable_free_tier ? [] : [1]
+          content {
+            name = "JWT_SECRET"
+            value_from {
+              secret_key_ref {
+                name = google_secret_manager_secret.jwt_secret[0].secret_id
+                key  = "latest"
+              }
+            }
+          }
+        }
+        
+        # キャッシュ設定（無料枠では必須）
+        env {
+          name  = "CACHE_ENABLED"
+          value = var.enable_free_tier ? "true" : "false"
+        }
+        
+        env {
+          name  = "CACHE_TTL"
+          value = var.enable_free_tier ? "3600" : "300"
+        }
+        
+        # リソース制限（無料枠では最小構成）
+        resources {
+          limits = {
+            cpu    = var.enable_free_tier ? "1" : "2"
+            memory = var.enable_free_tier ? "256Mi" : "512Mi"
+          }
+          
+          # 無料枠モードではリクエストを低く設定
+          requests = var.enable_free_tier ? {
+            cpu    = "0.08"
+            memory = "128Mi"
+          } : null
+        }
+      }
+      
+      service_account_name = google_service_account.backend.email
+      timeout_seconds      = 60
+    }
+    
+    metadata {
+      annotations = merge(
+        {
+          "autoscaling.knative.dev/maxScale" = var.enable_free_tier ? "1" : "10"
+          "autoscaling.knative.dev/minScale" = var.enable_free_tier ? "0" : "1"
+        },
+        var.enable_free_tier ? {
+          "autoscaling.knative.dev/target"            = "100"  # 1インスタンスで100並行リクエスト
+          "run.googleapis.com/cpu-throttling"         = "true"
+          "run.googleapis.com/execution-environment"  = "gen1"
+          "run.googleapis.com/startup-cpu-boost"      = "false"
+        } : {
+          "autoscaling.knative.dev/target" = "80"
+          "run.googleapis.com/execution-environment" = "gen2"
+        }
+      )
+    }
+  }
+  
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+  
+  depends_on = [
+    google_project_service.required_apis,
+  ]
+}
+
+# Cloud Run を公開
+resource "google_cloud_run_service_iam_member" "public" {
+  service  = google_cloud_run_service.backend.name
+  location = google_cloud_run_service.backend.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# Cloud Scheduler - ウォームアップジョブ（無料枠: 3ジョブまで）
+resource "google_cloud_scheduler_job" "warmup" {
+  count            = var.enable_free_tier ? 1 : 0
+  name             = "backend-warmup"
+  description      = "Keep backend warm during business hours"
+  schedule         = "*/30 9-18 * * MON-FRI"  # 平日9-18時、30分ごと
+  time_zone        = "Asia/Tokyo"
+  attempt_deadline = "30s"
+  
+  retry_config {
+    retry_count = 1
+  }
+  
+  http_target {
+    http_method = "GET"
+    uri         = "${google_cloud_run_service.backend.status[0].url}/health"
+    
+    headers = {
+      "User-Agent" = "Google-Cloud-Scheduler"
+    }
+  }
+  
+  depends_on = [google_cloud_run_service.backend]
+}
+
+# Cloud Storage バケット（無料枠では使用しない - Firebase Hostingを推奨）
 resource "google_storage_bucket" "frontend" {
+  count         = var.enable_free_tier ? 0 : 1
   name          = "${var.project_id}-harvest-frontend"
   location      = var.region
   force_destroy = true
@@ -186,17 +273,19 @@ resource "google_storage_bucket" "frontend" {
   uniform_bucket_level_access = true
 }
 
-# バケットを公開
+# バケットを公開（無料枠では不要）
 resource "google_storage_bucket_iam_member" "public_read" {
-  bucket = google_storage_bucket.frontend.name
+  count  = var.enable_free_tier ? 0 : 1
+  bucket = google_storage_bucket.frontend[0].name
   role   = "roles/storage.objectViewer"
   member = "allUsers"
 }
 
-# Load Balancer for Frontend (CDN)
+# Load Balancer（無料枠では使用しない）
 resource "google_compute_backend_bucket" "frontend_backend" {
+  count       = var.enable_free_tier ? 0 : 1
   name        = "harvest-frontend-backend"
-  bucket_name = google_storage_bucket.frontend.name
+  bucket_name = google_storage_bucket.frontend[0].name
   enable_cdn  = true
   
   cdn_policy {
@@ -210,19 +299,22 @@ resource "google_compute_backend_bucket" "frontend_backend" {
 }
 
 resource "google_compute_url_map" "frontend" {
+  count           = var.enable_free_tier ? 0 : 1
   name            = "harvest-frontend-urlmap"
-  default_service = google_compute_backend_bucket.frontend_backend.id
+  default_service = google_compute_backend_bucket.frontend_backend[0].id
 }
 
 resource "google_compute_target_https_proxy" "frontend" {
+  count   = var.enable_free_tier ? 0 : 1
   name    = "harvest-frontend-https-proxy"
-  url_map = google_compute_url_map.frontend.id
+  url_map = google_compute_url_map.frontend[0].id
   
-  ssl_certificates = [google_compute_managed_ssl_certificate.frontend.id]
+  ssl_certificates = [google_compute_managed_ssl_certificate.frontend[0].id]
 }
 
 resource "google_compute_managed_ssl_certificate" "frontend" {
-  name = "harvest-frontend-cert"
+  count = var.enable_free_tier ? 0 : 1
+  name  = "harvest-frontend-cert"
   
   managed {
     domains = [var.frontend_domain]
@@ -230,12 +322,44 @@ resource "google_compute_managed_ssl_certificate" "frontend" {
 }
 
 resource "google_compute_global_forwarding_rule" "frontend" {
-  name       = "harvest-frontend-forwarding-rule"
-  target     = google_compute_target_https_proxy.frontend.id
-  port_range = "443"
+  count       = var.enable_free_tier ? 0 : 1
+  name        = "harvest-frontend-forwarding-rule"
+  target      = google_compute_target_https_proxy.frontend[0].id
+  port_range  = "443"
   ip_protocol = "TCP"
   
   load_balancing_scheme = "EXTERNAL"
+}
+
+# 予算アラート（無料枠では必須）
+resource "google_billing_budget" "monthly_budget" {
+  count = var.enable_free_tier ? 1 : 0
+  
+  billing_account = var.billing_account
+  display_name    = "Harvest Monthly Budget"
+  
+  budget_filter {
+    projects = ["projects/${var.project_id}"]
+  }
+  
+  amount {
+    specified_amount {
+      currency_code = "JPY"
+      units         = var.monthly_budget_jpy
+    }
+  }
+  
+  threshold_rules {
+    threshold_percent = 0.5
+  }
+  
+  threshold_rules {
+    threshold_percent = 0.8
+  }
+  
+  threshold_rules {
+    threshold_percent = 1.0
+  }
 }
 
 # 出力
@@ -243,10 +367,16 @@ output "backend_url" {
   value = google_cloud_run_service.backend.status[0].url
 }
 
-output "frontend_bucket" {
-  value = google_storage_bucket.frontend.url
+output "frontend_url" {
+  value = var.enable_free_tier ? 
+    "Please deploy to Firebase Hosting for free tier" : 
+    google_storage_bucket.frontend[0].url
 }
 
-output "frontend_lb_ip" {
-  value = google_compute_global_forwarding_rule.frontend.ip_address
+output "deployment_mode" {
+  value = var.enable_free_tier ? "FREE_TIER" : "STANDARD"
+}
+
+output "monthly_budget" {
+  value = var.enable_free_tier ? "¥${var.monthly_budget_jpy}" : "No budget limit set"
 }

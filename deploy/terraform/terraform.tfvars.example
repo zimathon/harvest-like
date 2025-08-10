@@ -1,16 +1,156 @@
-# GCP プロジェクトID
-project_id = "your-gcp-project-id"
+# Terraform Variables Example for Harvest Like
+# Copy this file to terraform.tfvars and fill in your values
 
-# リージョン（us-central1 が無料枠に含まれる）
-region = "us-central1"
+# ===================================
+# REQUIRED VARIABLES
+# ===================================
 
-# JWT シークレット（ランダムな文字列を生成してください）
-# 例: openssl rand -base64 32
-jwt_secret = "your-jwt-secret-here"
+# Your GCP Project ID
+project_id = "your-project-id"
 
-# フロントエンドURL（CORS設定用）
-# Cloud Storage + CDN を使う場合
-frontend_url = "https://storage.googleapis.com/your-project-id-harvest-frontend"
+# JWT Secret for authentication (generate a secure random string)
+# Example: openssl rand -base64 32
+jwt_secret = "your-secure-jwt-secret-here"
 
-# カスタムドメインを使う場合（オプション）
-# frontend_domain = "harvest.yourdomain.com"
+# ===================================
+# FREE TIER CONFIGURATION (¥0-¥1,000/month)
+# ===================================
+
+# Enable free tier optimizations (RECOMMENDED for small teams)
+enable_free_tier = true
+
+# Monthly budget in JPY (free tier recommendation: 1000)
+monthly_budget_jpy = "1000"
+
+# Billing account ID (required for budget alerts)
+# Find it at: https://console.cloud.google.com/billing
+billing_account = "XXXXXX-XXXXXX-XXXXXX"
+
+# ===================================
+# OPTIONAL CONFIGURATION
+# ===================================
+
+# GCP Region (asia-northeast1 = Tokyo)
+region = "asia-northeast1"
+
+# Environment
+environment = "production"
+
+# Frontend URL (Firebase Hosting for free tier)
+frontend_url = "https://your-project-id.web.app"
+
+# ===================================
+# FREE TIER OPTIMIZED SETTINGS
+# (These defaults are optimized for free usage)
+# ===================================
+
+# Cloud Run Configuration
+cloud_run_min_instances = 0    # Don't keep instances running
+cloud_run_max_instances = 1    # Prevent scaling (avoid costs)
+cloud_run_memory        = "256Mi"  # Minimum memory
+cloud_run_cpu           = "1"
+cloud_run_concurrency   = 100  # Handle more requests per instance
+
+# Cache Configuration (IMPORTANT for free tier)
+cache_enabled = true
+cache_ttl     = 3600  # 1 hour cache to reduce Firestore reads
+
+# Warmup Schedule (only during business hours)
+warmup_schedule = "*/30 9-18 * * MON-FRI"
+warmup_enabled  = true
+
+# Firebase Hosting (FREE alternative to Cloud Storage)
+use_firebase_hosting = true
+firebase_project     = ""  # Leave empty to use same as project_id
+
+# Rate Limiting (Protect free tier limits)
+daily_firestore_read_limit  = 45000   # 90% of 50k free tier
+daily_firestore_write_limit = 18000   # 90% of 20k free tier
+daily_api_request_limit     = 1800000 # 90% of 2M free tier
+
+# User and Storage Limits
+max_users      = 50  # Reasonable for free tier
+max_storage_gb = 1   # Firestore free tier limit
+
+# Cost Control
+auto_shutdown_on_budget_exceed = true
+budget_alert_emails = [
+  # "your-email@example.com",
+  # "team@example.com"
+]
+
+# ===================================
+# STANDARD DEPLOYMENT SETTINGS
+# (Uncomment these if enable_free_tier = false)
+# ===================================
+
+# # Custom domain for frontend (requires Load Balancer)
+# frontend_domain = "app.yourdomain.com"
+
+# # Standard Cloud Run settings
+# cloud_run_min_instances = 1
+# cloud_run_max_instances = 10
+# cloud_run_memory        = "512Mi"
+
+# # Disable aggressive caching
+# cache_enabled = false
+# cache_ttl     = 300  # 5 minutes
+
+# # Enable CDN and Load Balancer
+# enable_cdn           = true
+# enable_load_balancer = true
+
+# # Enable monitoring
+# enable_monitoring   = true
+# log_retention_days = 30
+
+# ===================================
+# RESOURCE LABELS
+# ===================================
+
+labels = {
+  project     = "harvest-like"
+  environment = "production"
+  tier        = "free"
+  managed_by  = "terraform"
+}
+
+# ===================================
+# DEPLOYMENT TIPS FOR FREE TIER
+# ===================================
+# 
+# 1. Initial Setup:
+#    - Create a GCP project
+#    - Enable billing (required even for free tier)
+#    - Install gcloud CLI
+#    - Run: gcloud auth application-default login
+#
+# 2. State Bucket (one-time setup):
+#    gsutil mb gs://your-project-id-terraform-state
+#
+# 3. Firebase Setup (for free frontend hosting):
+#    - Install Firebase CLI: npm install -g firebase-tools
+#    - Login: firebase login
+#    - Initialize: firebase init hosting
+#    - Select your GCP project
+#
+# 4. Deploy Infrastructure:
+#    terraform init -backend-config="bucket=your-project-id-terraform-state"
+#    terraform plan
+#    terraform apply
+#
+# 5. Deploy Application:
+#    # Backend (Cloud Run)
+#    cd server
+#    gcloud builds submit --tag asia-northeast1-docker.pkg.dev/your-project-id/harvest-backend/api:latest
+#    
+#    # Frontend (Firebase Hosting - FREE)
+#    cd ..
+#    npm run build
+#    firebase deploy --only hosting
+#
+# 6. Monitor Costs:
+#    https://console.cloud.google.com/billing
+#
+# IMPORTANT: With these settings, you should stay within ¥0-¥1,000/month!
+# Monitor your usage regularly in the first month to ensure you stay within limits.
