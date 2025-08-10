@@ -2,16 +2,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
-import { connectDB } from './config/db.js';
-
-// Import routes
-import authRoutes from './routes/auth.js';
-import clientRoutes from './routes/clients.js';
-import expenseRoutes from './routes/expenses.js';
-import projectRoutes from './routes/projects.js';
-import timeEntryRoutes from './routes/timeEntries.js';
-import userRoutes from './routes/users.js';
-import invoiceRoutes from './routes/invoices.js';
 
 // Import Firestore routes
 import authRoutesFirestore from './routes/auth.firestore.js';
@@ -31,9 +21,6 @@ if (process.env.NODE_ENV === 'development') {
 
 // Load environment variables (dotenv.config() は一度だけ呼び出す)
 dotenv.config(); // .env ファイルを読み込む
-
-// Connect to Database
-connectDB();
 
 const app = express();
 
@@ -66,16 +53,12 @@ app.use(express.json());
 // app.use(cors()); // <<< 元の cors() 呼び出しは削除
 app.use(morgan('dev'));
 
-// Routes - MongoDB (v1)
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/time-entries', timeEntryRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/clients', clientRoutes);
-app.use('/api/invoices', invoiceRoutes);
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running', timestamp: new Date().toISOString() });
+});
 
-// Routes - Firestore (v2)
+// Routes - Firestore only
 app.use('/api/v2/auth', authRoutesFirestore);
 app.use('/api/v2/users', usersRoutesFirestore);
 app.use('/api/v2/projects', projectsRoutesFirestore);
