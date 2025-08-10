@@ -76,7 +76,7 @@ export const getProject = async (req: AuthRequestFirestore, res: Response): Prom
     }
 
     // Populate client and members
-    const client = await Client.findById(project.client);
+    const client = await Client.findById(project.clientId || project.client);
     const membersWithDetails = await Promise.all(
       project.members.map(async (member) => {
         const user = await User.findById(member.user);
@@ -95,6 +95,7 @@ export const getProject = async (req: AuthRequestFirestore, res: Response): Prom
     const projectWithDetails = {
       ...project,
       clientDetails: client,
+      clientName: client?.name || 'Unknown Client',
       members: membersWithDetails
     };
 
@@ -123,10 +124,11 @@ export const createProject = async (req: AuthRequestFirestore, res: Response): P
       return;
     }
 
-    const { clientId, ...projectData } = req.body;
+    const { clientId, client, ...projectData } = req.body;
 
-    // Check if clientId is provided
-    if (!clientId) {
+    // Check if clientId or client is provided (support both field names)
+    const actualClientId = clientId || client;
+    if (!actualClientId) {
       res.status(400).json({
         success: false,
         error: 'Client ID is required'
@@ -135,8 +137,8 @@ export const createProject = async (req: AuthRequestFirestore, res: Response): P
     }
 
     // Verify client exists and belongs to user
-    const client = await Client.findById(clientId);
-    if (!client) {
+    const clientDoc = await Client.findById(actualClientId);
+    if (!clientDoc) {
       res.status(404).json({
         success: false,
         error: 'Client not found'
@@ -144,7 +146,7 @@ export const createProject = async (req: AuthRequestFirestore, res: Response): P
       return;
     }
 
-    if (client.userId !== req.user.id) {
+    if (clientDoc.userId !== req.user.id) {
       res.status(401).json({
         success: false,
         error: 'Not authorized to use this client'
@@ -154,15 +156,21 @@ export const createProject = async (req: AuthRequestFirestore, res: Response): P
 
     const project = await Project.create({
       ...projectData,
-      clientId,
+      clientId: actualClientId,
       userId: req.user.id,
       members: projectData.members || [],
       tasks: projectData.tasks || []
     });
 
+    // Add clientName to response
+    const projectWithClient = {
+      ...project,
+      clientName: clientDoc.name || 'Unknown Client'
+    };
+
     res.status(201).json({
       success: true,
-      data: project
+      data: projectWithClient
     });
   } catch (error) {
     console.error('❌ Error creating project:', error);
@@ -206,8 +214,9 @@ export const updateProject = async (req: AuthRequestFirestore, res: Response): P
     }
 
     // If updating client, verify it exists and belongs to user
-    if (req.body.client) {
-      const client = await Client.findById(req.body.client);
+    const newClientId = req.body.clientId || req.body.client;
+    if (newClientId) {
+      const client = await Client.findById(newClientId);
       if (!client) {
         res.status(404).json({
           success: false,
@@ -225,7 +234,14 @@ export const updateProject = async (req: AuthRequestFirestore, res: Response): P
       }
     }
 
-    project = await Project.update(req.params.id, req.body);
+    // Prepare update data with proper clientId field
+    const updateData = { ...req.body };
+    if (newClientId) {
+      updateData.clientId = newClientId;
+      delete updateData.client; // Remove client field if it exists
+    }
+
+    project = await Project.update(req.params.id, updateData);
 
     if (!project) {
       res.status(404).json({
@@ -235,9 +251,16 @@ export const updateProject = async (req: AuthRequestFirestore, res: Response): P
       return;
     }
 
+    // Add clientName to response
+    const clientDoc = await Client.findById(project.clientId);
+    const projectWithClient = {
+      ...project,
+      clientName: clientDoc?.name || 'Unknown Client'
+    };
+
     res.status(200).json({
       success: true,
-      data: project
+      data: projectWithClient
     });
   } catch (error) {
     res.status(500).json({
