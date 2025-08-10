@@ -4,11 +4,16 @@ let db: Firestore;
 
 export const initializeFirestore = () => {
   if (!db) {
-    // ローカル開発環境の設定
-    if (process.env.NODE_ENV === 'development') {
+    // Emulatorを使用するかどうかの判定
+    const useEmulator = process.env.USE_FIRESTORE_EMULATOR === 'true' || 
+                       process.env.FIRESTORE_EMULATOR_HOST;
+    
+    if (useEmulator) {
+      // Emulator使用（テスト環境）
+      console.log('🔧 Using Firestore Emulator at', process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8090');
       db = new Firestore({
         projectId: 'harvest-local',
-        host: 'localhost:8090',
+        host: process.env.FIRESTORE_EMULATOR_HOST || 'localhost:8090',
         ssl: false,
         credentials: {
           client_email: 'test@example.com',
@@ -16,9 +21,11 @@ export const initializeFirestore = () => {
         }
       });
     } else {
-      // 本番環境
+      // 本番Firestore使用（ローカル開発でも本番でも）
+      const projectId = process.env.PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'harvest-a82c0';
+      console.log('🌐 Using Production Firestore:', projectId);
       db = new Firestore({
-        projectId: process.env.GOOGLE_CLOUD_PROJECT,
+        projectId: projectId,
       });
     }
   }

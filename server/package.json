@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "NODE_ENV=production node dist/index.js",
+    "start:production": "NODE_ENV=production USE_FIRESTORE_EMULATOR=false PROJECT_ID=harvest-a82c0 node dist/index.js",
     "dev": "npx tsx watch src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -16,8 +17,8 @@
     "test:firestore": "FIRESTORE_EMULATOR_HOST=localhost:8090 NODE_ENV=development node dist/test-firestore.js",
     "migrate:firestore": "FIRESTORE_EMULATOR_HOST=localhost:8090 NODE_ENV=development npx tsx src/scripts/migrate-to-firestore.ts",
     "test:firestore:features": "FIRESTORE_EMULATOR_HOST=localhost:8090 NODE_ENV=development npx ts-node src/scripts/test-firestore-features.ts",
-    "firestore:start": "firebase emulators:start --only firestore --import=./.firestore-data --export-on-exit",
-    "firestore:clear": "rm -rf ./.firestore-data && echo '✅ Firestore data cleared successfully!'"
+    "firestore:start": "./scripts/start-firestore.sh",
+    "firestore:clear": "rm -rf ./firestore-data && echo '✅ Firestore data cleared successfully!'"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.11.2",
