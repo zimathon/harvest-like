@@ -1,0 +1,10 @@
+{
+  "projects": {
+    "default": "harvest-a82c0",
+    "production": "harvest-a82c0",
+    "staging": "harvest-staging",
+    "development": "harvest-dev-local"
+  },
+  "targets": {},
+  "etags": {}
+}
