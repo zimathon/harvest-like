@@ -103,7 +103,7 @@ const TimeTracking = () => {
 
   // タイマーが動いている間のリアルタイム更新
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     
     if (activeEntry) {
       interval = setInterval(() => {
@@ -124,7 +124,7 @@ const TimeTracking = () => {
       
       // プロジェクトIDを設定
       const projectId = selectedTimeEntry.project?._id || selectedTimeEntry.project?.id;
-      setSelectedProjectId(projectId);
+      setSelectedProjectId(projectId || '');
       
       // プロジェクトのタスクを取得してタスクIDを設定
       const project = projects.find(p => (p._id || p.id) === projectId);
@@ -160,8 +160,8 @@ const TimeTracking = () => {
     // 開始時刻がある場合（タイマー実行中）
     if (entry.startTime) {
       let startDate: Date;
-      if (typeof entry.startTime === 'object' && '_seconds' in entry.startTime) {
-        startDate = new Date(entry.startTime._seconds * 1000);
+      if (typeof entry.startTime === 'string') {
+        startDate = new Date(entry.startTime);
       } else {
         startDate = new Date(entry.startTime);
       }
@@ -175,8 +175,8 @@ const TimeTracking = () => {
     // 作成時刻を表示
     if (entry.createdAt) {
       let createdDate: Date;
-      if (typeof entry.createdAt === 'object' && '_seconds' in entry.createdAt) {
-        createdDate = new Date(entry.createdAt._seconds * 1000);
+      if (typeof entry.createdAt === 'string') {
+        createdDate = new Date(entry.createdAt);
       } else {
         createdDate = new Date(entry.createdAt);
       }
@@ -191,16 +191,17 @@ const TimeTracking = () => {
   };
 
   // タイマーの経過時間を計算
-  const getElapsedTime = (startTime: string | Date | { _seconds: number; _nanoseconds: number }) => {
+  const getElapsedTime = (startTime: string | Date | undefined) => {
+    if (!startTime) return 0;
+    
     let start: Date;
     
     if (typeof startTime === 'string') {
       start = new Date(startTime);
-    } else if (startTime && typeof startTime === 'object' && '_seconds' in startTime) {
-      // Firestore Timestamp format
-      start = new Date(startTime._seconds * 1000);
+    } else if (startTime instanceof Date) {
+      start = startTime;
     } else {
-      start = new Date(startTime);
+      return 0;
     }
     
     const now = currentTime;
@@ -218,9 +219,9 @@ const TimeTracking = () => {
       if (typeof entry.date === 'string') {
         // If it's already a string date, use it directly or parse if needed
         entryDate = entry.date.includes('T') ? entry.date.split('T')[0] : entry.date;
-      } else if (entry.date && typeof entry.date === 'object' && '_seconds' in entry.date) {
+      } else if (entry.date && false) {
         // Firestore timestamp format
-        entryDate = new Date(entry.date._seconds * 1000).toISOString().split('T')[0];
+        entryDate = new Date(entry.date).toISOString().split('T')[0];
       } else {
         // Other date formats or invalid dates
         return false;
@@ -233,15 +234,9 @@ const TimeTracking = () => {
     return todayEntries.sort((a, b) => {
       const getTime = (entry: TimeEntry) => {
         if (entry.startTime) {
-          if (typeof entry.startTime === 'object' && '_seconds' in entry.startTime) {
-            return entry.startTime._seconds * 1000;
-          }
           return new Date(entry.startTime).getTime();
         }
         if (entry.createdAt) {
-          if (typeof entry.createdAt === 'object' && '_seconds' in entry.createdAt) {
-            return entry.createdAt._seconds * 1000;
-          }
           return new Date(entry.createdAt).getTime();
         }
         return 0;
@@ -267,8 +262,8 @@ const TimeTracking = () => {
       
       if (typeof entry.date === 'string') {
         entryDate = new Date(entry.date);
-      } else if (entry.date && typeof entry.date === 'object' && '_seconds' in entry.date) {
-        entryDate = new Date(entry.date._seconds * 1000);
+      } else if (entry.date && false) {
+        entryDate = new Date(entry.date);
       } else {
         return false;
       }
@@ -296,8 +291,8 @@ const TimeTracking = () => {
       
       if (typeof entry.date === 'string') {
         entryDate = new Date(entry.date);
-      } else if (entry.date && typeof entry.date === 'object' && '_seconds' in entry.date) {
-        entryDate = new Date(entry.date._seconds * 1000);
+      } else if (entry.date && false) {
+        entryDate = new Date(entry.date);
       } else {
         return false;
       }
@@ -545,7 +540,7 @@ const TimeTracking = () => {
               <Box p={3} bg="blue.50" borderRadius="md" border="1px" borderColor="blue.200">
                 <Flex justify="space-between" align="center">
                   <Text fontWeight="bold" color="blue.600">
-                    Editing Time Entry: {selectedTimeEntry.project?.name || 'Unknown Project'} - {selectedTimeEntry.task}
+                    Editing Time Entry: {selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
                   </Text>
                   <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
                     Cancel Edit
@@ -651,7 +646,7 @@ const TimeTracking = () => {
                 <Flex justify="space-between" align="center">
                   <Box>
                     <Text fontWeight="bold">Timer Running</Text>
-                    <Text>{activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {activeEntry.task}</Text>
+                    <Text>{activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {typeof activeEntry.task === 'string' ? activeEntry.task : activeEntry.task?.name}</Text>
                     <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
                     {activeEntry.startTime && (
                       <Text fontSize="lg" fontWeight="bold" color="green.600">
@@ -703,7 +698,7 @@ const TimeTracking = () => {
                     <Tr key={entry._id || entry.id}>
                       <Td>{formatEntryTime(entry)}</Td>
                       <Td>{entry.project?.name || 'Unknown Project'}</Td>
-                      <Td>{entry.task}</Td>
+                      <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                       <Td>{entry.notes || '-'}</Td>
                       <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                       <Td>
@@ -756,7 +751,7 @@ const TimeTracking = () => {
                     <Tr key={entry._id || entry.id}>
                       <Td>{entry.date}</Td>
                       <Td>{entry.project?.name || 'Unknown Project'}</Td>
-                      <Td>{entry.task}</Td>
+                      <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                       <Td>{entry.notes || '-'}</Td>
                       <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                       <Td>
@@ -809,7 +804,7 @@ const TimeTracking = () => {
                     <Tr key={entry._id || entry.id}>
                       <Td>{entry.date}</Td>
                       <Td>{entry.project?.name || 'Unknown Project'}</Td>
-                      <Td>{entry.task}</Td>
+                      <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                       <Td>{entry.notes || '-'}</Td>
                       <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                       <Td>
@@ -861,12 +856,8 @@ const TimeTracking = () => {
                   <Tbody>
                     {timeEntries
                       .sort((a, b) => {
-                        const dateA = a.date && typeof a.date === 'object' && '_seconds' in a.date
-                          ? new Date(a.date._seconds * 1000)
-                          : new Date(a.date);
-                        const dateB = b.date && typeof b.date === 'object' && '_seconds' in b.date
-                          ? new Date(b.date._seconds * 1000)
-                          : new Date(b.date);
+                        const dateA = new Date(a.date);
+                        const dateB = new Date(b.date);
                         return dateB.getTime() - dateA.getTime();
                       })
                       .slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage)
@@ -874,7 +865,7 @@ const TimeTracking = () => {
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
                         <Td>{entry.project?.name || 'Unknown Project'}</Td>
-                        <Td>{entry.task}</Td>
+                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || '-'}</Td>
                         <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
                         <Td>

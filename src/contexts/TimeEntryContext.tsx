@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, ReactNode, useCallback } from 'react';
-import { TimeEntry } from '../types';
+import type { TimeEntry } from '../types';
 import { useAuth } from './AuthContext';
-import * as timeEntryService from '../services/timeEntryService';
+import timeEntryService from '../services/timeEntryService';
 
 // 時間記録状態の型定義
 interface TimeEntryState {
@@ -34,7 +34,7 @@ type TimeEntryAction =
 // コンテキストの型定義
 interface TimeEntryContextType extends TimeEntryState {
   fetchTimeEntries: () => Promise<void>;
-  addTimeEntry: (entry: Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>) => Promise<TimeEntry>;
+  addTimeEntry: (entry: Partial<TimeEntry>) => Promise<TimeEntry>;
   updateTimeEntry: (id: string, entry: Partial<TimeEntry>) => Promise<TimeEntry>;
   deleteTimeEntry: (id: string) => Promise<void>;
   startTimer: (projectId: string, taskId: string, notes?: string, isBillable?: boolean) => Promise<TimeEntry>;
@@ -147,7 +147,7 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   // 時間記録追加
-  const addTimeEntry = async (entryData: Omit<TimeEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addTimeEntry = async (entryData: Partial<TimeEntry>) => {
     if (!user) throw new Error('User not authenticated');
     
     try {

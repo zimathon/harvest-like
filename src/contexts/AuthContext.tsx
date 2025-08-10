@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
 import { User } from '../types';
-import * as authService from '../services/authService';
+import authService from '../services/authService';
 
 // 認証状態の型定義
 interface AuthState {
@@ -87,7 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (token) {
           // トークンがある場合、現在のユーザー情報を取得
           const user = await authService.getCurrentUser();
-          dispatch({ type: 'LOGIN_SUCCESS', payload: user });
+          if (user) {
+            dispatch({ type: 'LOGIN_SUCCESS', payload: user });
+          } else {
+            dispatch({ type: 'LOGOUT' });
+          }
         } else {
           dispatch({ type: 'LOGOUT' });
         }

@@ -45,7 +45,7 @@ const Dashboard = () => {
   const todayHours = useMemo(() => {
     return timeEntries
       .filter(entry => entry.date === today)
-      .reduce((total, entry) => total + entry.duration, 0);
+      .reduce((total, entry) => total + (entry.duration || 0), 0);
   }, [timeEntries, today]);
   
   // 今週の時間
@@ -56,12 +56,10 @@ const Dashboard = () => {
     
     return timeEntries
       .filter(entry => {
-        const entryDate = entry.date && typeof entry.date === 'object' && '_seconds' in entry.date
-          ? new Date(entry.date._seconds * 1000)
-          : new Date(entry.date);
+        const entryDate = new Date(entry.date);
         return entryDate >= startOfWeek;
       })
-      .reduce((total, entry) => total + entry.duration, 0);
+      .reduce((total, entry) => total + (entry.duration || 0), 0);
   }, [timeEntries]);
   
   // 今月の時間
@@ -71,31 +69,25 @@ const Dashboard = () => {
     
     return timeEntries
       .filter(entry => {
-        const entryDate = entry.date && typeof entry.date === 'object' && '_seconds' in entry.date
-          ? new Date(entry.date._seconds * 1000)
-          : new Date(entry.date);
+        const entryDate = new Date(entry.date);
         return entryDate >= startOfMonth;
       })
-      .reduce((total, entry) => total + entry.duration, 0);
+      .reduce((total, entry) => total + (entry.duration || 0), 0);
   }, [timeEntries]);
   
   // 未請求金額（例として時間 * 100ドルで計算）
   const unbilledAmount = useMemo(() => {
     return timeEntries
       .filter(entry => entry.isBillable)
-      .reduce((total, entry) => total + (entry.duration / 3600) * 100, 0);
+      .reduce((total, entry) => total + ((entry.duration || 0) / 3600) * 100, 0);
   }, [timeEntries]);
   
   // 最近の時間エントリー（最新5件）
   const recentTimeEntries = useMemo(() => {
     return [...timeEntries]
       .sort((a, b) => {
-        const dateA = a.updatedAt && typeof a.updatedAt === 'object' && '_seconds' in a.updatedAt
-          ? new Date(a.updatedAt._seconds * 1000)
-          : new Date(a.updatedAt);
-        const dateB = b.updatedAt && typeof b.updatedAt === 'object' && '_seconds' in b.updatedAt
-          ? new Date(b.updatedAt._seconds * 1000)
-          : new Date(b.updatedAt);
+        const dateA = new Date(a.updatedAt || '');
+        const dateB = new Date(b.updatedAt || '');
         return dateB.getTime() - dateA.getTime();
       })
       .slice(0, 5);
@@ -105,12 +97,8 @@ const Dashboard = () => {
   const recentExpenses = useMemo(() => {
     return [...expenses]
       .sort((a, b) => {
-        const dateA = a.updatedAt && typeof a.updatedAt === 'object' && '_seconds' in a.updatedAt
-          ? new Date(a.updatedAt._seconds * 1000)
-          : new Date(a.updatedAt);
-        const dateB = b.updatedAt && typeof b.updatedAt === 'object' && '_seconds' in b.updatedAt
-          ? new Date(b.updatedAt._seconds * 1000)
-          : new Date(b.updatedAt);
+        const dateA = new Date(a.updatedAt || '');
+        const dateB = new Date(b.updatedAt || '');
         return dateB.getTime() - dateA.getTime();
       })
       .slice(0, 5);
@@ -124,7 +112,7 @@ const Dashboard = () => {
       // プロジェクトの時間を集計
       const projectHours = timeEntries
         .filter(entry => entry.project?.id === project.id)
-        .reduce((total, entry) => total + entry.duration, 0);
+        .reduce((total, entry) => total + (entry.duration || 0), 0);
       
       // 予算に対する進捗率を計算（仮定として、予算が時間または金額で設定されているものとする）
       let progress = 0;
@@ -165,14 +153,12 @@ const Dashboard = () => {
   };
   
   // 日付をフォーマット
-  const formatDate = (dateValue: string | { _seconds: number; _nanoseconds: number }) => {
+  const formatDate = (dateValue: string | undefined) => {
+    if (!dateValue) return 'N/A';
     let date: Date;
     
     if (typeof dateValue === 'string') {
       date = new Date(dateValue);
-    } else if (dateValue && typeof dateValue === 'object' && '_seconds' in dateValue) {
-      // Firestore Timestamp format
-      date = new Date(dateValue._seconds * 1000);
     } else {
       // Invalid date - return empty string or placeholder
       return 'N/A';
@@ -272,7 +258,7 @@ const Dashboard = () => {
                     <Tr key={entry.id}>
                       <Td>{formatDate(entry.date)}</Td>
                       <Td>{entry.project?.name || 'Unknown Project'}</Td>
-                      <Td>{formatHours(entry.duration)}</Td>
+                      <Td>{formatHours(entry.duration || 0)}</Td>
                       <Td>
                         {entry.isRunning ? (
                           <Badge colorScheme="green">Running</Badge>

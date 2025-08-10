@@ -37,7 +37,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { useProjects } from '../contexts/ProjectContext'
 import { useUsers } from '../contexts/UserContext'
 import { useAuth } from '../contexts/AuthContext'
-import * as timeEntryService from '../services/timeEntryService'
+import timeEntryService from '../services/timeEntryService'
 import { TimeEntry } from '../types'
 
 const Reports = () => {
@@ -125,9 +125,7 @@ const Reports = () => {
       }
       
       // Fetch time entries based on user role
-      const entries = user?.role === 'admin' && selectedUser !== 'all' 
-        ? await timeEntryService.getAllTimeEntries(params)
-        : await timeEntryService.getMyTimeEntries(params);
+      const entries = await timeEntryService.getMyTimeEntries(params);
       
       setReportData(entries);
       setReportGenerated(true);
@@ -141,10 +139,10 @@ const Reports = () => {
   // Aggregate data by project
   const projectSummary = useMemo(() => {
     const summary = reportData.reduce((acc, entry) => {
-      const projectId = entry.project.id;
+      const projectId = entry.project?.id || entry.projectId || '';
       if (!acc[projectId]) {
         acc[projectId] = {
-          project: entry.project,
+          project: entry.project || { id: projectId, name: entry.projectName || 'Unknown' },
           totalHours: 0,
           billableHours: 0,
           entries: 0,
@@ -152,9 +150,9 @@ const Reports = () => {
         };
       }
       
-      acc[projectId].totalHours += entry.duration / 3600; // Convert seconds to hours
+      acc[projectId].totalHours += (entry.duration || 0) / 3600; // Convert seconds to hours
       if (entry.isBillable) {
-        acc[projectId].billableHours += entry.duration / 3600; // Convert seconds to hours
+        acc[projectId].billableHours += (entry.duration || 0) / 3600; // Convert seconds to hours
       }
       acc[projectId].entries += 1;
       acc[projectId].users.add(entry.userId);

@@ -202,7 +202,8 @@ const Projects = () => {
 
       const projectData = {
         name: projectName,
-        clientId: clientId, // Client IDを渡す (バックエンドはclientIdを期待)
+        client: clientId, // API expects 'client' field
+        clientId: clientId, // Keep for backward compatibility
         description,
         status,
         budget: isNaN(budgetNumber) ? 0 : budgetNumber,
@@ -312,7 +313,7 @@ const Projects = () => {
           <Tbody>
             {filteredProjects.map((project) => {
               // Firestore版ではclientNameが直接含まれている
-              const clientName = project.clientName || project.client?.name || 'N/A'
+              const clientName = project.clientName || (typeof project.client === 'object' ? project.client?.name : project.client) || 'N/A'
 
               return (
                 <Tr key={project._id || project.id}>

@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useReducer } from 'react';
-import * as projectService from '../services/projectService.js';
-import { Project } from '../types/index.js';
+import projectService from '../services/projectService.js';
+import type { Project } from '../types';
 import { useAuth } from './AuthContext.js'; // useAuthフックをインポート
 
 // プロジェクト状態の型定義
@@ -68,17 +68,17 @@ const projectReducer = (state: ProjectState, action: ProjectAction): ProjectStat
       return {
         ...state,
         projects: state.projects.map(project => 
-          (project._id || project.id) === (action.payload._id || action.payload.id) ? action.payload : project
+          project.id === action.payload.id ? action.payload : project
         ),
-        selectedProject: (state.selectedProject?._id || state.selectedProject?.id) === (action.payload._id || action.payload.id)
+        selectedProject: state.selectedProject?.id === action.payload.id
           ? action.payload 
           : state.selectedProject
       };
     case 'DELETE_PROJECT':
       return {
         ...state,
-        projects: state.projects.filter(project => (project._id || project.id) !== action.payload),
-        selectedProject: (state.selectedProject?._id || state.selectedProject?.id) === action.payload 
+        projects: state.projects.filter(project => project.id !== action.payload),
+        selectedProject: state.selectedProject?.id === action.payload 
           ? null 
           : state.selectedProject
       };
