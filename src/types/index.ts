@@ -11,8 +11,9 @@ export interface User {
 // プロジェクト関連の型定義
 export interface Project {
   id: string;
+  _id?: string; // For backward compatibility
   name: string;
-  client?: Client; // MongoDB版で使用（オプショナル）
+  client?: Client | string; // MongoDB版で使用（オプショナル）
   clientId?: string; // Firestore版で使用
   clientName?: string; // Firestore版で使用（populated）
   description?: string;
@@ -21,6 +22,10 @@ export interface Project {
   budgetType?: 'hourly' | 'fixed';
   hourlyRate?: number;
   tasks?: Task[];
+  startDate?: string;
+  endDate?: string;
+  members?: { user: string; role: string }[];
+  userId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,7 +33,10 @@ export interface Project {
 // タスク関連の型定義
 export interface Task {
   id?: string; // Add id property
+  _id?: string; // For backward compatibility
   name: string;
+  description?: string;
+  rate?: number;
   defaultRate?: number;
   isBillable: boolean;
 }
@@ -36,6 +44,7 @@ export interface Task {
 // クライアント関連の型定義
 export interface Client {
   id: string;
+  _id?: string; // For backward compatibility
   name: string;
   contactName?: string;
   email?: string;
@@ -48,18 +57,25 @@ export interface Client {
 // 時間記録の型定義
 export interface TimeEntry {
   id: string;
+  _id?: string; // For backward compatibility
   userId: string;
-  project: Project;
-  task: Task;
+  user?: User;
+  projectId?: string;
+  project?: Project;
+  projectName?: string;
+  task?: Task | string;
+  taskId?: string;
   date: string;
   startTime?: string;
   endTime?: string;
-  duration: number; // 時間（小数点）
+  duration?: number; // 時間（小数点）
+  hours?: number; // Alternative to duration
   notes?: string;
+  description?: string;
   isBillable: boolean;
   isRunning: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 経費の型定義

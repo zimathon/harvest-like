@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import User from '../models/firestore/User.js';
+import { sendInvitationEmail } from '../services/emailService.js';
 
 // @desc    Get all users
 // @route   GET /api/v2/users
@@ -57,9 +58,10 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 // @desc    Create user
 // @route   POST /api/v2/users
 // @access  Private/Admin
-export const createUser = async (req: Request, res: Response): Promise<void> => {
+export const createUser = async (req: any, res: Response): Promise<void> => {
   try {
     const { name, email, password, role } = req.body;
+    const inviterName = req.user?.name || 'Administrator';
 
     // Check if user already exists
     const existingUser = await User.findByEmail(email);
@@ -79,12 +81,22 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
       isActive: true
     });
 
+    // Send invitation email
+    try {
+      await sendInvitationEmail(email, name, password, inviterName);
+      console.log(`✅ Invitation email sent to ${email}`);
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError);
+      // Continue even if email fails - user is already created
+    }
+
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
     res.status(201).json({
       success: true,
-      data: userWithoutPassword
+      data: userWithoutPassword,
+      message: 'User created successfully. Invitation email has been sent.'
     });
   } catch (error) {
     res.status(500).json({
