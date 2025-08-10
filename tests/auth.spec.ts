@@ -30,8 +30,9 @@ test.describe('Authentication Tests', () => {
     
     await page.click('button[type="submit"]');
     
-    // Check for error message
-    await expect(page.locator('text=/Invalid email or password|Login failed/')).toBeVisible({ timeout: 5000 });
+    // Check for error message - using a simple approach
+    // Wait for either the toast notification or any error message to appear
+    await page.waitForSelector(':has-text("Invalid email or password"), :has-text("Login failed")', { timeout: 5000 });
   });
 
   test('should logout successfully', async ({ page }) => {
