@@ -15,8 +15,8 @@ output "deployment_info" {
 output "backend_service" {
   description = "Backend service details"
   value = {
-    url             = google_cloud_run_service.backend.status[0].url
-    service_name    = google_cloud_run_service.backend.name
+    url             = var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url
+    service_name    = var.enable_free_tier ? google_cloud_run_service.backend_free[0].name : google_cloud_run_service.backend[0].name
     min_instances   = var.enable_free_tier ? 0 : 1
     max_instances   = var.enable_free_tier ? 1 : 10
     memory          = var.enable_free_tier ? "256Mi" : "512Mi"
@@ -42,14 +42,17 @@ output "frontend_service" {
 output "database_info" {
   description = "Firestore database configuration"
   value = {
-    name         = google_firestore_database.database.name
-    location     = google_firestore_database.database.location_id
-    type         = google_firestore_database.database.type
+    name         = var.enable_free_tier ? data.google_firestore_database.main_free[0].name : google_firestore_database.database[0].name
+    location     = var.enable_free_tier ? data.google_firestore_database.main_free[0].location_id : google_firestore_database.database[0].location_id
+    type         = var.enable_free_tier ? data.google_firestore_database.main_free[0].type : google_firestore_database.database[0].type
     mode         = var.enable_free_tier ? "Single Region" : "Multi Region"
     daily_limits = var.enable_free_tier ? {
       reads  = var.daily_firestore_read_limit
       writes = var.daily_firestore_write_limit
-    } : "No limits"
+    } : {
+      reads  = "unlimited"
+      writes = "unlimited"
+    }
   }
 }
 
@@ -85,16 +88,29 @@ output "free_tier_limits" {
     }
     scheduler = "3 jobs free"
     storage   = "5GB free (if using Cloud Storage)"
-  } : "Standard pricing applies"
+  } : {
+    cloud_run = {
+      requests = "Standard pricing"
+      memory   = "Standard pricing"
+      cpu      = "Standard pricing"
+    }
+    firestore = {
+      storage = "Standard pricing"
+      reads   = "Standard pricing"
+      writes  = "Standard pricing"
+    }
+    scheduler = "Standard pricing"
+    storage   = "Standard pricing"
+  }
 }
 
 # API Endpoints
 output "api_endpoints" {
   description = "API endpoint URLs"
   value = {
-    base_url     = google_cloud_run_service.backend.status[0].url
-    health_check = "${google_cloud_run_service.backend.status[0].url}/health"
-    api_v2       = "${google_cloud_run_service.backend.status[0].url}/api/v2"
+    base_url     = var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url
+    health_check = var.enable_free_tier ? "${google_cloud_run_service.backend_free[0].status[0].url}/health" : "${google_cloud_run_service.backend[0].status[0].url}/health"
+    api_v2       = var.enable_free_tier ? "${google_cloud_run_service.backend_free[0].status[0].url}/api/v2" : "${google_cloud_run_service.backend[0].status[0].url}/api/v2"
   }
 }
 
@@ -124,7 +140,7 @@ output "deployment_commands" {
 output "monitoring_urls" {
   description = "Monitoring and management URLs"
   value = {
-    cloud_run_console = "https://console.cloud.google.com/run/detail/${var.region}/${google_cloud_run_service.backend.name}?project=${var.project_id}"
+    cloud_run_console = var.enable_free_tier ? "https://console.cloud.google.com/run/detail/${var.region}/${google_cloud_run_service.backend_free[0].name}?project=${var.project_id}" : "https://console.cloud.google.com/run/detail/${var.region}/${google_cloud_run_service.backend[0].name}?project=${var.project_id}"
     firestore_console = "https://console.cloud.google.com/firestore/data?project=${var.project_id}"
     billing_console   = "https://console.cloud.google.com/billing?project=${var.project_id}"
     logs_explorer     = "https://console.cloud.google.com/logs/query?project=${var.project_id}"
@@ -140,7 +156,7 @@ output "config_summary" {
     Mode: ${var.enable_free_tier ? "FREE TIER (¥0-¥1,000/month)" : "STANDARD"}
     
     Backend:
-      URL: ${google_cloud_run_service.backend.status[0].url}
+      URL: ${var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url}
       Memory: ${var.enable_free_tier ? "256Mi" : "512Mi"}
       Instances: ${var.enable_free_tier ? "0-1" : "1-10"}
       Cache: ${var.enable_free_tier ? "Enabled (1 hour)" : "Optional"}
@@ -151,7 +167,7 @@ output "config_summary" {
     
     Database:
       Type: Firestore Native
-      Location: ${google_firestore_database.database.location_id}
+      Location: ${var.enable_free_tier ? data.google_firestore_database.main_free[0].location_id : google_firestore_database.database[0].location_id}
       Daily Limits: ${var.enable_free_tier ? "45k reads, 18k writes" : "Unlimited"}
     
     Cost Controls:
@@ -160,7 +176,7 @@ output "config_summary" {
     
     Next Steps:
     1. ${var.enable_free_tier ? "Deploy frontend: firebase deploy --only hosting" : "Upload frontend: gsutil rsync -r dist/ gs://${var.project_id}-harvest-frontend/"}
-    2. Test API: curl ${google_cloud_run_service.backend.status[0].url}/health
+    2. Test API: curl ${var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url}/health
     3. Monitor costs: https://console.cloud.google.com/billing?project=${var.project_id}
   EOT
 }

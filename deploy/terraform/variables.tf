@@ -19,11 +19,7 @@ variable "environment" {
 }
 
 # Free Tier Configuration
-variable "enable_free_tier" {
-  description = "Enable free tier optimizations (¥0~¥1,000/month)"
-  type        = bool
-  default     = true  # デフォルトで無料枠最適化を有効
-}
+# enable_free_tier is defined in free-tier.tf
 
 variable "monthly_budget_jpy" {
   description = "Monthly budget in JPY (only used when enable_free_tier is true)"

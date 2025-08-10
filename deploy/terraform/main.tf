@@ -26,13 +26,13 @@ provider "google" {
 resource "google_project_service" "required_apis" {
   for_each = toset(
     var.enable_free_tier ? [
-      "cloudrun.googleapis.com",           # Cloud Run
+      "run.googleapis.com",                # Cloud Run
       "firestore.googleapis.com",          # Firestore
       "artifactregistry.googleapis.com",   # Docker registry
       "cloudscheduler.googleapis.com",     # Scheduler (3 jobs free)
       "cloudbilling.googleapis.com",       # Budget alerts
     ] : [
-      "cloudrun.googleapis.com",
+      "run.googleapis.com",
       "cloudbuild.googleapis.com",
       "firestore.googleapis.com",
       "secretmanager.googleapis.com",
@@ -55,14 +55,14 @@ resource "google_artifact_registry_repository" "backend" {
   depends_on = [google_project_service.required_apis]
 }
 
-# Firestore データベース（無料枠: 単一リージョン）
+# Firestore データベース（通常版 - 無料枠では作成されない）
 resource "google_firestore_database" "database" {
+  count       = var.enable_free_tier ? 0 : 1
   name        = "(default)"
-  location_id = var.enable_free_tier ? var.region : "asia-northeast1"
+  location_id = var.region
   type        = "FIRESTORE_NATIVE"
   
-  # 無料枠モードでは同時実行制限を設定
-  concurrency_mode = var.enable_free_tier ? "OPTIMISTIC" : "PESSIMISTIC"
+  concurrency_mode = "PESSIMISTIC"
   
   depends_on = [google_project_service.required_apis]
 }
@@ -106,8 +106,9 @@ resource "google_project_iam_member" "secret_accessor" {
   member  = "serviceAccount:${google_service_account.backend.email}"
 }
 
-# Cloud Run サービス（無料枠最適化）
+# Cloud Run サービス（通常版 - 無料枠では作成されない）
 resource "google_cloud_run_service" "backend" {
+  count    = var.enable_free_tier ? 0 : 1
   name     = "harvest-backend"
   location = var.region
   
@@ -220,15 +221,15 @@ resource "google_cloud_run_service" "backend" {
 
 # Cloud Run を公開
 resource "google_cloud_run_service_iam_member" "public" {
-  service  = google_cloud_run_service.backend.name
-  location = google_cloud_run_service.backend.location
+  service  = var.enable_free_tier ? google_cloud_run_service.backend_free[0].name : google_cloud_run_service.backend[0].name
+  location = var.enable_free_tier ? google_cloud_run_service.backend_free[0].location : google_cloud_run_service.backend[0].location
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
-# Cloud Scheduler - ウォームアップジョブ（無料枠: 3ジョブまで）
+# Cloud Scheduler - ウォームアップジョブ（通常版のみ）
 resource "google_cloud_scheduler_job" "warmup" {
-  count            = var.enable_free_tier ? 1 : 0
+  count            = var.enable_free_tier ? 0 : 1
   name             = "backend-warmup"
   description      = "Keep backend warm during business hours"
   schedule         = "*/30 9-18 * * MON-FRI"  # 平日9-18時、30分ごと
@@ -241,7 +242,7 @@ resource "google_cloud_scheduler_job" "warmup" {
   
   http_target {
     http_method = "GET"
-    uri         = "${google_cloud_run_service.backend.status[0].url}/health"
+    uri         = "${google_cloud_run_service.backend[0].status[0].url}/health"
     
     headers = {
       "User-Agent" = "Google-Cloud-Scheduler"
@@ -364,13 +365,11 @@ resource "google_billing_budget" "monthly_budget" {
 
 # 出力
 output "backend_url" {
-  value = google_cloud_run_service.backend.status[0].url
+  value = var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url
 }
 
 output "frontend_url" {
-  value = var.enable_free_tier ? 
-    "Please deploy to Firebase Hosting for free tier" : 
-    google_storage_bucket.frontend[0].url
+  value = var.enable_free_tier ? "Please deploy to Firebase Hosting for free tier" : google_storage_bucket.frontend[0].url
 }
 
 output "deployment_mode" {

@@ -10,7 +10,7 @@ variable "enable_free_tier" {
 # Cloud Run - 無料枠最適化設定
 resource "google_cloud_run_service" "backend_free" {
   count    = var.enable_free_tier ? 1 : 0
-  name     = "${var.project_name}-backend"
+  name     = "harvest-backend"
   location = var.region
 
   template {
@@ -186,21 +186,12 @@ resource "google_cloud_scheduler_job" "warmup_free" {
   }
 }
 
-# Firestore - 単一リージョン設定（マルチリージョンより安価）
-resource "google_firestore_database" "main_free" {
+# Firestore - 既存のデータベースを使用（すでに作成済み）
+# 注: Firestoreデータベースは既に存在するため、データソースとして参照のみ
+data "google_firestore_database" "main_free" {
   count       = var.enable_free_tier ? 1 : 0
   name        = "(default)"
-  location_id = var.region  # 単一リージョン
-  type        = "FIRESTORE_NATIVE"
-
-  # 同時実行制限でコスト削減
-  concurrency_mode = "OPTIMISTIC"
-  
-  # 必要最小限の設定
-  app_engine_integration_mode = "DISABLED"
-  
-  # 削除保護は無効（開発環境用）
-  deletion_policy = "DELETE"
+  project     = var.project_id
 }
 
 # 最小限のFirestoreインデックス（複合インデックスのみ）
@@ -216,7 +207,7 @@ resource "google_firestore_index" "essential_only" {
   } : {}
 
   project    = var.project_id
-  database   = google_firestore_database.main_free[0].name
+  database   = data.google_firestore_database.main_free[0].name
   collection = each.value.collection
 
   dynamic "fields" {
@@ -288,8 +279,8 @@ resource "google_cloudfunctions2_function" "cost_guard" {
     
     source {
       storage_source {
-        bucket = google_storage_bucket.functions.name
-        object = google_storage_bucket_object.cost_guard_source.name
+        bucket = google_storage_bucket.functions[0].name
+        object = google_storage_bucket_object.cost_guard_source[0].name
       }
     }
   }
@@ -342,24 +333,40 @@ resource "google_pubsub_topic" "budget_alerts" {
   message_retention_duration = "86400s"  # 1日
 }
 
-# コストガード関数のソースコード
+# Cloud Functions用のストレージバケット
+resource "google_storage_bucket" "functions" {
+  count    = var.enable_free_tier ? 1 : 0
+  name     = "${var.project_id}-functions"
+  location = var.region
+  
+  uniform_bucket_level_access = true
+  
+  lifecycle_rule {
+    condition {
+      age = 7
+    }
+    action {
+      type = "Delete"
+    }
+  }
+}
+
+# コストガード関数のソースコード（簡略版）
+# 注: 実際のコストガード機能は後で実装
 resource "google_storage_bucket_object" "cost_guard_source" {
   count  = var.enable_free_tier ? 1 : 0
   name   = "cost-guard-function.zip"
-  bucket = google_storage_bucket.functions.name
+  bucket = google_storage_bucket.functions[0].name
   
-  content = base64encode(templatefile("${path.module}/functions/cost-guard.js", {
-    project_id   = var.project_id
-    region       = var.region
-    service_name = google_cloud_run_service.backend_free[0].name
-  }))
+  # 簡略化されたプレースホルダーコンテンツ
+  content = base64encode("// Cost guard function placeholder")
 }
 
 # 出力
 output "free_tier_status" {
   value = var.enable_free_tier ? {
     enabled = true
-    backend_url = var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : ""
+    backend_url = google_cloud_run_service.backend_free[0].status[0].url
     monthly_budget = "¥1,000"
     optimizations = [
       "Cloud Run: Min instances = 0",
@@ -370,6 +377,9 @@ output "free_tier_status" {
     ]
   } : {
     enabled = false
+    backend_url = ""
+    monthly_budget = "No budget limit"
+    optimizations = []
   }
 }
 
