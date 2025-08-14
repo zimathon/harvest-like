@@ -1,0 +1,90 @@
+name: Deploy to Staging
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: harvest-a82c0
+  REGION: asia-northeast1
+
+jobs:
+  test-and-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test
+        continue-on-error: true
+      
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: https://harvest-backend-sxoezkwvgq-an.a.run.app/api/v2
+      
+      - name: Deploy Preview to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ env.PROJECT_ID }}
+          expires: 7d
+      
+      - name: Comment PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && comment.body.includes('Preview URL')
+            );
+            
+            const body = `## 🚀 Preview Deployment
+            
+            **Preview URL**: ${{ steps.deploy.outputs.details_url }}
+            **Expires**: 7 days
+            
+            ### Test Results
+            - ✅ Build successful
+            - ⚠️ Tests: ${{ steps.test.outcome }}
+            
+            ---
+            *Updated: ${new Date().toISOString()}*`;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            }
