@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "harvest-a82c0",
     "public": "dist",
     "ignore": [
       "firebase.json",

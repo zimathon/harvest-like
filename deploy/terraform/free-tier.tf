@@ -17,7 +17,7 @@ resource "google_cloud_run_service" "backend_free" {
     spec {
       # コンテナ設定
       containers {
-        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.backend.name}/api:latest"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.backend.name}/backend:latest"
         
         # 最小限のリソース割り当て
         resources {
@@ -40,6 +40,26 @@ resource "google_cloud_run_service" "backend_free" {
         }
         
         env {
+          name  = "PROJECT_ID"
+          value = var.project_id
+        }
+        
+        env {
+          name  = "USE_FIRESTORE_EMULATOR"
+          value = "false"
+        }
+        
+        env {
+          name  = "JWT_SECRET"
+          value = "production-secret-key-change-this-in-production"
+        }
+        
+        env {
+          name  = "CORS_ALLOWED_ORIGINS"
+          value = "https://harvest-a82c0.web.app,https://harvest-a82c0.firebaseapp.com,http://localhost:5173"
+        }
+        
+        env {
           name  = "CACHE_ENABLED"
           value = "true"
         }
@@ -49,28 +69,28 @@ resource "google_cloud_run_service" "backend_free" {
           value = "3600"  # 1時間のキャッシュ
         }
         
-        # ヘルスチェックの間隔を長くしてリクエスト削減
-        liveness_probe {
-          http_get {
-            path = "/health"
-            port = 8080
-          }
-          initial_delay_seconds = 60
-          period_seconds        = 300  # 5分ごと
-          timeout_seconds       = 10
-          failure_threshold     = 3
-        }
+        # ヘルスチェックは一旦コメントアウト（コンテナが起動しない問題を解決するため）
+        # liveness_probe {
+        #   http_get {
+        #     path = "/health"
+        #     port = 8080
+        #   }
+        #   initial_delay_seconds = 60
+        #   period_seconds        = 300  # 5分ごと
+        #   timeout_seconds       = 10
+        #   failure_threshold     = 3
+        # }
         
-        startup_probe {
-          http_get {
-            path = "/health"
-            port = 8080
-          }
-          initial_delay_seconds = 0
-          period_seconds        = 10
-          timeout_seconds       = 5
-          failure_threshold     = 10
-        }
+        # startup_probe {
+        #   http_get {
+        #     path = "/health"
+        #     port = 8080
+        #   }
+        #   initial_delay_seconds = 0
+        #   period_seconds        = 10
+        #   timeout_seconds       = 5
+        #   failure_threshold     = 10
+        # }
       }
       
       # サービスアカウント
@@ -187,12 +207,8 @@ resource "google_cloud_scheduler_job" "warmup_free" {
 }
 
 # Firestore - 既存のデータベースを使用（すでに作成済み）
-# 注: Firestoreデータベースは既に存在するため、データソースとして参照のみ
-data "google_firestore_database" "main_free" {
-  count       = var.enable_free_tier ? 1 : 0
-  name        = "(default)"
-  project     = var.project_id
-}
+# 注: Firestoreデータベースは既に存在するため、新規作成しない
+# Firestoreインデックスのみを管理
 
 # 最小限のFirestoreインデックス（複合インデックスのみ）
 resource "google_firestore_index" "essential_only" {
@@ -207,7 +223,7 @@ resource "google_firestore_index" "essential_only" {
   } : {}
 
   project    = var.project_id
-  database   = data.google_firestore_database.main_free[0].name
+  database   = "(default)"  # 既存のデフォルトデータベースを使用
   collection = each.value.collection
 
   dynamic "fields" {
@@ -219,169 +235,169 @@ resource "google_firestore_index" "essential_only" {
   }
 }
 
-# 予算アラート設定
-resource "google_billing_budget" "free_tier_alert" {
-  count = var.enable_free_tier ? 1 : 0
-  
-  billing_account = var.billing_account
-  display_name    = "Free Tier Budget Alert"
-  
-  budget_filter {
-    projects = ["projects/${var.project_id}"]
-    
-    # 監視するサービス
-    services = [
-      "services/24E6-581D-38E5",  # Cloud Run
-      "services/95FF-2EF5-5EA1",  # Firestore
-      "services/95E7-47C1-48E0",  # Cloud Storage
-    ]
-  }
-  
-  amount {
-    specified_amount {
-      currency_code = "JPY"
-      units         = "1000"  # 1,000円
-    }
-  }
-  
-  # 閾値アラート
-  threshold_rules {
-    threshold_percent = 0.5  # 50%
-    spend_basis       = "CURRENT_SPEND"
-  }
-  
-  threshold_rules {
-    threshold_percent = 0.8  # 80%
-    spend_basis       = "CURRENT_SPEND"
-  }
-  
-  threshold_rules {
-    threshold_percent = 1.0  # 100%
-    spend_basis       = "CURRENT_SPEND"
-  }
-  
-  # 通知設定
-  all_updates_rule {
-    monitoring_notification_channels = []
-    disable_default_iam_recipients   = false
-  }
-}
+# # 予算アラート設定（Billing APIの権限問題があるため一時的にコメントアウト）
+# # resource "google_billing_budget" "free_tier_alert" {
+# #   count = var.enable_free_tier ? 1 : 0
+# #   
+# #   billing_account = var.billing_account
+# #   display_name    = "Free Tier Budget Alert"
+#   
+#   budget_filter {
+#     projects = ["projects/${var.project_id}"]
+#     
+#     # 監視するサービス
+#     services = [
+#       "services/24E6-581D-38E5",  # Cloud Run
+#       "services/95FF-2EF5-5EA1",  # Firestore
+#       "services/95E7-47C1-48E0",  # Cloud Storage
+#     ]
+#   }
+#   
+#   amount {
+#     specified_amount {
+#       currency_code = "JPY"
+#       units         = "1000"  # 1,000円
+#     }
+#   }
+#   
+#   # 閾値アラート
+#   threshold_rules {
+#     threshold_percent = 0.5  # 50%
+#     spend_basis       = "CURRENT_SPEND"
+#   }
+#   
+#   threshold_rules {
+#     threshold_percent = 0.8  # 80%
+#     spend_basis       = "CURRENT_SPEND"
+#   }
+#   
+#   threshold_rules {
+#     threshold_percent = 1.0  # 100%
+#     spend_basis       = "CURRENT_SPEND"
+#   }
+#   
+#   # 通知設定
+#   all_updates_rule {
+#     monitoring_notification_channels = []
+#     disable_default_iam_recipients   = false
+#   }
+# }
+# 
+# # コスト超過時の自動スケールダウン（Cloud Function）
+# resource "google_cloudfunctions2_function" "cost_guard" {
+#   count    = var.enable_free_tier ? 1 : 0
+#   name     = "cost-guard-auto-shutdown"
+#   location = var.region
+# 
+#   build_config {
+#     runtime     = "nodejs18"
+#     entry_point = "costGuard"
+#     
+#     source {
+#       storage_source {
+#         bucket = google_storage_bucket.functions[0].name
+#         object = google_storage_bucket_object.cost_guard_source[0].name
+#       }
+#     }
+#   }
 
-# コスト超過時の自動スケールダウン（Cloud Function）
-resource "google_cloudfunctions2_function" "cost_guard" {
-  count    = var.enable_free_tier ? 1 : 0
-  name     = "cost-guard-auto-shutdown"
-  location = var.region
+#   service_config {
+#     max_instance_count = 1
+#     min_instance_count = 0
+#     available_memory   = "128Mi"
+#     timeout_seconds    = 60
+#     
+#     environment_variables = {
+#       PROJECT_ID      = var.project_id
+#       REGION          = var.region
+#       BUDGET_LIMIT    = "1000"
+#       SERVICE_NAME    = google_cloud_run_service.backend_free[0].name
+#     }
+#     
+#     service_account_email = google_service_account.cost_guard[0].email
+#   }
+# 
+#   event_trigger {
+#     trigger_region = var.region
+#     event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
+#     pubsub_topic   = google_pubsub_topic.budget_alerts[0].id
+#     retry_policy   = "RETRY_POLICY_DO_NOT_RETRY"
+#   }
+# }
+# 
+# # コストガード用のサービスアカウント
+# resource "google_service_account" "cost_guard" {
+#   count        = var.enable_free_tier ? 1 : 0
+#   account_id   = "cost-guard-sa"
+#   display_name = "Cost Guard Service Account"
+#   description  = "Service account for automatic cost control"
+# }
+# 
+# # Cloud Run管理権限
+# resource "google_project_iam_member" "cost_guard_run_admin" {
+#   count   = var.enable_free_tier ? 1 : 0
+#   project = var.project_id
+#   role    = "roles/run.admin"
+#   member  = "serviceAccount:${google_service_account.cost_guard[0].email}"
+# }
+# 
+# # Pub/Subトピック（予算アラート用）
+# resource "google_pubsub_topic" "budget_alerts" {
+#   count = var.enable_free_tier ? 1 : 0
+#   name  = "budget-alerts"
+#   
+#   message_retention_duration = "86400s"  # 1日
+# }
 
-  build_config {
-    runtime     = "nodejs18"
-    entry_point = "costGuard"
-    
-    source {
-      storage_source {
-        bucket = google_storage_bucket.functions[0].name
-        object = google_storage_bucket_object.cost_guard_source[0].name
-      }
-    }
-  }
-
-  service_config {
-    max_instance_count = 1
-    min_instance_count = 0
-    available_memory   = "128Mi"
-    timeout_seconds    = 60
-    
-    environment_variables = {
-      PROJECT_ID      = var.project_id
-      REGION          = var.region
-      BUDGET_LIMIT    = "1000"
-      SERVICE_NAME    = google_cloud_run_service.backend_free[0].name
-    }
-    
-    service_account_email = google_service_account.cost_guard[0].email
-  }
-
-  event_trigger {
-    trigger_region = var.region
-    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic   = google_pubsub_topic.budget_alerts[0].id
-    retry_policy   = "RETRY_POLICY_DO_NOT_RETRY"
-  }
-}
-
-# コストガード用のサービスアカウント
-resource "google_service_account" "cost_guard" {
-  count        = var.enable_free_tier ? 1 : 0
-  account_id   = "cost-guard-sa"
-  display_name = "Cost Guard Service Account"
-  description  = "Service account for automatic cost control"
-}
-
-# Cloud Run管理権限
-resource "google_project_iam_member" "cost_guard_run_admin" {
-  count   = var.enable_free_tier ? 1 : 0
-  project = var.project_id
-  role    = "roles/run.admin"
-  member  = "serviceAccount:${google_service_account.cost_guard[0].email}"
-}
-
-# Pub/Subトピック（予算アラート用）
-resource "google_pubsub_topic" "budget_alerts" {
-  count = var.enable_free_tier ? 1 : 0
-  name  = "budget-alerts"
-  
-  message_retention_duration = "86400s"  # 1日
-}
-
-# Cloud Functions用のストレージバケット
-resource "google_storage_bucket" "functions" {
-  count    = var.enable_free_tier ? 1 : 0
-  name     = "${var.project_id}-functions"
-  location = var.region
-  
-  uniform_bucket_level_access = true
-  
-  lifecycle_rule {
-    condition {
-      age = 7
-    }
-    action {
-      type = "Delete"
-    }
-  }
-}
-
-# コストガード関数のソースコード（簡略版）
-# 注: 実際のコストガード機能は後で実装
-resource "google_storage_bucket_object" "cost_guard_source" {
-  count  = var.enable_free_tier ? 1 : 0
-  name   = "cost-guard-function.zip"
-  bucket = google_storage_bucket.functions[0].name
-  
-  # 簡略化されたプレースホルダーコンテンツ
-  content = base64encode("// Cost guard function placeholder")
-}
-
-# 出力
-output "free_tier_status" {
-  value = var.enable_free_tier ? {
-    enabled = true
-    backend_url = google_cloud_run_service.backend_free[0].status[0].url
-    monthly_budget = "¥1,000"
-    optimizations = [
-      "Cloud Run: Min instances = 0",
-      "Cloud Run: Max instances = 1", 
-      "Firestore: Single region",
-      "Frontend: Firebase Hosting (free)",
-      "Monitoring: Budget alerts enabled"
-    ]
-  } : {
-    enabled = false
-    backend_url = ""
-    monthly_budget = "No budget limit"
-    optimizations = []
-  }
-}
+# # Cloud Functions用のストレージバケット
+# resource "google_storage_bucket" "functions" {
+#   count    = var.enable_free_tier ? 1 : 0
+#   name     = "${var.project_id}-functions"
+#   location = var.region
+#   
+#   uniform_bucket_level_access = true
+#   
+#   lifecycle_rule {
+#     condition {
+#       age = 7
+#     }
+#     action {
+#       type = "Delete"
+#     }
+#   }
+# }
+# 
+# # コストガード関数のソースコード（簡略版）
+# # 注: 実際のコストガード機能は後で実装
+# resource "google_storage_bucket_object" "cost_guard_source" {
+#   count  = var.enable_free_tier ? 1 : 0
+#   name   = "cost-guard-function.zip"
+#   bucket = google_storage_bucket.functions[0].name
+#   
+#   # 簡略化されたプレースホルダーコンテンツ
+#   content = base64encode("// Cost guard function placeholder")
+# }
+# 
+# # 出力
+# output "free_tier_status" {
+#   value = var.enable_free_tier ? {
+#     enabled = true
+#     backend_url = google_cloud_run_service.backend_free[0].status[0].url
+#     monthly_budget = "¥1,000"
+#     optimizations = [
+#       "Cloud Run: Min instances = 0",
+#       "Cloud Run: Max instances = 1", 
+#       "Firestore: Single region",
+#       "Frontend: Firebase Hosting (free)",
+#       "Monitoring: Budget alerts enabled"
+#     ]
+#   } : {
+#     enabled = false
+#     backend_url = ""
+#     monthly_budget = "No budget limit"
+#     optimizations = []
+#   }
+# }
 
 output "cost_saving_tips" {
   value = [

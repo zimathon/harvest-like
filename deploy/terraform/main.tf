@@ -332,50 +332,50 @@ resource "google_compute_global_forwarding_rule" "frontend" {
   load_balancing_scheme = "EXTERNAL"
 }
 
-# 予算アラート（無料枠では必須）
-resource "google_billing_budget" "monthly_budget" {
-  count = var.enable_free_tier ? 1 : 0
-  
-  billing_account = var.billing_account
-  display_name    = "Harvest Monthly Budget"
-  
-  budget_filter {
-    projects = ["projects/${var.project_id}"]
-  }
-  
-  amount {
-    specified_amount {
-      currency_code = "JPY"
-      units         = var.monthly_budget_jpy
-    }
-  }
-  
-  threshold_rules {
-    threshold_percent = 0.5
-  }
-  
-  threshold_rules {
-    threshold_percent = 0.8
-  }
-  
-  threshold_rules {
-    threshold_percent = 1.0
-  }
-}
-
-# 出力
-output "backend_url" {
-  value = var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url
-}
-
-output "frontend_url" {
-  value = var.enable_free_tier ? "Please deploy to Firebase Hosting for free tier" : google_storage_bucket.frontend[0].url
-}
-
-output "deployment_mode" {
-  value = var.enable_free_tier ? "FREE_TIER" : "STANDARD"
-}
-
-output "monthly_budget" {
-  value = var.enable_free_tier ? "¥${var.monthly_budget_jpy}" : "No budget limit set"
-}
+# # 予算アラート（無料枠では必須）
+# resource "google_billing_budget" "monthly_budget" {
+#   count = var.enable_free_tier ? 1 : 0
+#   
+#   billing_account = var.billing_account
+#   display_name    = "Harvest Monthly Budget"
+#   
+#   budget_filter {
+#     projects = ["projects/${var.project_id}"]
+#   }
+#   
+#   amount {
+#     specified_amount {
+#       currency_code = "JPY"
+#       units         = var.monthly_budget_jpy
+#     }
+#   }
+#   
+#   threshold_rules {
+#     threshold_percent = 0.5
+#   }
+#   
+#   threshold_rules {
+#     threshold_percent = 0.8
+#   }
+#   
+#   threshold_rules {
+#     threshold_percent = 1.0
+#   }
+# }
+# 
+# # 出力
+# output "backend_url" {
+#   value = var.enable_free_tier ? google_cloud_run_service.backend_free[0].status[0].url : google_cloud_run_service.backend[0].status[0].url
+# }
+# 
+# output "frontend_url" {
+#   value = var.enable_free_tier ? "Please deploy to Firebase Hosting for free tier" : google_storage_bucket.frontend[0].url
+# }
+# 
+# output "deployment_mode" {
+#   value = var.enable_free_tier ? "FREE_TIER" : "STANDARD"
+# }
+# 
+# output "monthly_budget" {
+#   value = var.enable_free_tier ? "¥${var.monthly_budget_jpy}" : "No budget limit set"
+# }

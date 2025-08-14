@@ -42,9 +42,9 @@ output "frontend_service" {
 output "database_info" {
   description = "Firestore database configuration"
   value = {
-    name         = var.enable_free_tier ? data.google_firestore_database.main_free[0].name : google_firestore_database.database[0].name
-    location     = var.enable_free_tier ? data.google_firestore_database.main_free[0].location_id : google_firestore_database.database[0].location_id
-    type         = var.enable_free_tier ? data.google_firestore_database.main_free[0].type : google_firestore_database.database[0].type
+    name         = var.enable_free_tier ? "(default)" : google_firestore_database.database[0].name
+    location     = var.enable_free_tier ? "us-central1" : google_firestore_database.database[0].location_id
+    type         = var.enable_free_tier ? "FIRESTORE_NATIVE" : google_firestore_database.database[0].type
     mode         = var.enable_free_tier ? "Single Region" : "Multi Region"
     daily_limits = var.enable_free_tier ? {
       reads  = var.daily_firestore_read_limit
@@ -167,7 +167,7 @@ output "config_summary" {
     
     Database:
       Type: Firestore Native
-      Location: ${var.enable_free_tier ? data.google_firestore_database.main_free[0].location_id : google_firestore_database.database[0].location_id}
+      Location: ${var.enable_free_tier ? "us-central1" : google_firestore_database.database[0].location_id}
       Daily Limits: ${var.enable_free_tier ? "45k reads, 18k writes" : "Unlimited"}
     
     Cost Controls:
