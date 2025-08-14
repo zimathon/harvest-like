@@ -77,8 +77,7 @@ export const createUser = async (req: any, res: Response): Promise<void> => {
       name,
       email,
       password,
-      role: role || 'user',
-      isActive: true
+      role: role || 'user'
     });
 
     // Send invitation email

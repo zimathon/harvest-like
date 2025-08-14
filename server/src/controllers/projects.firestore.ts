@@ -84,8 +84,7 @@ export const getProject = async (req: AuthRequestFirestore, res: Response): Prom
           user: user ? {
             id: user.id,
             name: user.name,
-            email: user.email,
-            avatar: user.avatar
+            email: user.email
           } : null,
           role: member.role
         };

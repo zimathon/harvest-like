@@ -28,7 +28,7 @@ export class UserModel {
       ? userData.password 
       : await bcrypt.hash(userData.password, 10);
     
-    const user: Omit<IUser, 'id'> = {
+    const user: any = {
       ...userData,
       password: hashedPassword,
       createdAt: now,

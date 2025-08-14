@@ -137,7 +137,7 @@ export const getTimeEntriesReport = async (req: AuthRequestFirestore, res: Respo
         }
         
         projectGroups[projectId].totalHours += entry.duration || 0;
-        if (entry.billable) {
+        if (entry.isBillable) {
           projectGroups[projectId].billableHours += entry.duration || 0;
         }
         projectGroups[projectId].entries.push(entry);
@@ -154,7 +154,7 @@ export const getTimeEntriesReport = async (req: AuthRequestFirestore, res: Respo
       const dateGroups: { [key: string]: any } = {};
       
       for (const entry of timeEntries) {
-        const dateKey = entry.date.toDate().toISOString().split('T')[0];
+        const dateKey = typeof entry.date === 'string' ? entry.date : (entry.date as any).toDate().toISOString().split('T')[0];
         
         if (!dateGroups[dateKey]) {
           dateGroups[dateKey] = {
@@ -166,7 +166,7 @@ export const getTimeEntriesReport = async (req: AuthRequestFirestore, res: Respo
         }
         
         dateGroups[dateKey].totalHours += entry.duration || 0;
-        if (entry.billable) {
+        if (entry.isBillable) {
           dateGroups[dateKey].billableHours += entry.duration || 0;
         }
         dateGroups[dateKey].entries.push(entry);
@@ -261,7 +261,7 @@ export const getProjectsReport = async (req: AuthRequestFirestore, res: Response
       // Get time entries for this project
       const timeEntries = await TimeEntry.findByProject(project.id!, filters);
       const totalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
-      const billableHours = timeEntries.filter(e => e.billable).reduce((sum, entry) => sum + (entry.duration || 0), 0);
+      const billableHours = timeEntries.filter(e => e.isBillable).reduce((sum, entry) => sum + (entry.duration || 0), 0);
       
       // Calculate revenue
       const revenue = billableHours * (project.hourlyRate || 0);
@@ -345,7 +345,7 @@ export const getClientsReport = async (req: AuthRequestFirestore, res: Response)
       for (const project of projects) {
         const timeEntries = await TimeEntry.findByProject(project.id!, filters);
         const projectTotalHours = timeEntries.reduce((sum, entry) => sum + (entry.duration || 0), 0);
-        const projectBillableHours = timeEntries.filter(e => e.billable).reduce((sum, entry) => sum + (entry.duration || 0), 0);
+        const projectBillableHours = timeEntries.filter(e => e.isBillable).reduce((sum, entry) => sum + (entry.duration || 0), 0);
         
         totalHours += projectTotalHours;
         billableHours += projectBillableHours;

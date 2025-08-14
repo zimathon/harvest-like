@@ -87,7 +87,7 @@ app.use((err: AppError, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-const PORT = process.env.PORT || 5000; // .env で PORT=5001 に設定済み
+const PORT = process.env.PORT || 8080; // Cloud Runではデフォルト8080
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

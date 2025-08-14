@@ -22,7 +22,7 @@ export type ProjectsResponse = components['schemas']['ProjectsResponse'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 
 // API Client configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api/v2';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v2';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 

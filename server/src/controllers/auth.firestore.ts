@@ -26,8 +26,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       name,
       email,
       password,
-      role: role || 'user',
-      isActive: true
+      role: role || 'user'
     });
 
     sendTokenResponse(user, 201, res);
