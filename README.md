@@ -2,6 +2,22 @@
 
 This repository contains a time tracking application with a React frontend and a Node.js/Express backend.
 
+## 🌐 Production Environment
+
+### Live URLs
+- **Frontend Application**: https://harvest-a82c0.web.app
+- **Backend API**: https://harvest-backend-sxoezkwvgq-an.a.run.app
+  - API Base URL: `https://harvest-backend-sxoezkwvgq-an.a.run.app/api/v2`
+
+### Login Credentials
+- **Email**: `admin@example.com`
+- **Password**: `admin123`
+
+### Management Consoles
+- [Firebase Console](https://console.firebase.google.com/project/harvest-a82c0)
+- [Cloud Run Console](https://console.cloud.google.com/run/detail/asia-northeast1/harvest-backend/metrics?project=harvest-a82c0)
+- [Firestore Console](https://console.firebase.google.com/project/harvest-a82c0/firestore)
+
 ## Getting Started
 
 Follow these instructions to set up and run the project locally.
