@@ -96,6 +96,17 @@ export const getMyTimeEntries = async (req: AuthRequestFirestore, res: Response)
     const entriesWithProjects = await Promise.all(
       entries.map(async (entry) => {
         const project = await Project.findById(entry.projectId);
+        
+        // Debug logging
+        if (entry.hours && entry.hours > 24) {
+          console.log('⚠️ Unusual hours value detected:', {
+            id: entry.id,
+            hours: entry.hours,
+            duration: entry.duration,
+            date: entry.date
+          });
+        }
+        
         return {
           ...entry,
           projectName: project?.name || 'Unknown Project'
