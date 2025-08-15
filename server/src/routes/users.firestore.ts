@@ -14,17 +14,17 @@ const router = express.Router();
 // All routes require authentication
 router.use(protect);
 
-// Admin only routes
+// Routes with different permission levels
 router
   .route('/')
-  .get(authorize('admin'), getUsers)
-  .post(authorize('admin'), createUser);
+  .get(getUsers)  // Any authenticated user can view users
+  .post(authorize('admin'), createUser);  // Only admins can create users
 
 router
   .route('/:id')
-  .get(authorize('admin'), getUser)
-  .put(authorize('admin'), updateUser)
-  .delete(authorize('admin'), deleteUser);
+  .get(getUser)  // Any authenticated user can view a specific user
+  .put(authorize('admin'), updateUser)  // Only admins can update users
+  .delete(authorize('admin'), deleteUser);  // Only admins can delete users
 
 // Password update - admin or own account
 router.put('/:id/password', updatePassword);
