@@ -35,7 +35,7 @@ gcloud config set project ${PROJECT_ID}
 
 # Build Docker image
 echo -e "${GREEN}Building Docker image...${NC}"
-cd server
+cd ../../server
 IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/api:latest"
 docker build --platform=linux/amd64 -f Dockerfile.production -t ${IMAGE_TAG} .
 
