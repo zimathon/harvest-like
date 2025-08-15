@@ -18,12 +18,16 @@
     "migrate:firestore": "FIRESTORE_EMULATOR_HOST=localhost:8090 NODE_ENV=development npx tsx src/scripts/migrate-to-firestore.ts",
     "test:firestore:features": "FIRESTORE_EMULATOR_HOST=localhost:8090 NODE_ENV=development npx ts-node src/scripts/test-firestore-features.ts",
     "firestore:start": "./scripts/start-firestore.sh",
-    "firestore:clear": "rm -rf ./firestore-data && echo '✅ Firestore data cleared successfully!'"
+    "firestore:clear": "rm -rf ./firestore-data && echo '✅ Firestore data cleared successfully!'",
+    "update-user": "npx tsx scripts/update-user.ts",
+    "user": "npx tsx scripts/update-user-local.ts"
   },
   "dependencies": {
     "@google-cloud/firestore": "^7.11.2",
+    "@types/commander": "^2.12.0",
     "@types/nodemailer": "^6.4.17",
     "bcryptjs": "^2.4.3",
+    "commander": "^14.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
