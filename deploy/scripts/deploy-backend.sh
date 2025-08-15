@@ -7,7 +7,7 @@ set -e
 
 # Configuration
 ENVIRONMENT=${1:-production}
-PROJECT_ID="harvest-like-prod"
+PROJECT_ID="harvest-a82c0"
 REGION="asia-northeast1"
 SERVICE_NAME="harvest-backend"
 REPOSITORY="harvest-backend"
@@ -37,7 +37,7 @@ gcloud config set project ${PROJECT_ID}
 echo -e "${GREEN}Building Docker image...${NC}"
 cd server
 IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/api:latest"
-docker build -f Dockerfile.production -t ${IMAGE_TAG} .
+docker build --platform=linux/amd64 -f Dockerfile.production -t ${IMAGE_TAG} .
 
 # Push to Artifact Registry
 echo -e "${GREEN}Pushing image to Artifact Registry...${NC}"
@@ -51,14 +51,15 @@ gcloud run deploy ${SERVICE_NAME} \
     --region ${REGION} \
     --allow-unauthenticated \
     --set-env-vars "NODE_ENV=${ENVIRONMENT}" \
-    --set-env-vars "PORT=8080" \
-    --set-secrets "JWT_SECRET=jwt-secret:latest" \
+    --set-env-vars "JWT_SECRET=0aafbf8b391afe1bb826349b3045645101c5a1cf0f913c689d56ed742645866c" \
+    --set-env-vars "CORS_ALLOWED_ORIGINS=https://harvest-a82c0.web.app" \
     --memory 512Mi \
     --cpu 1 \
     --timeout 60 \
     --concurrency 80 \
     --max-instances 10 \
-    --min-instances 0
+    --min-instances 0 \
+    --port 8080
 
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} \
