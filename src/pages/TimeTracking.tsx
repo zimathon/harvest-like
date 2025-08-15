@@ -149,46 +149,35 @@ const TimeTracking = () => {
       return '0h 0m';
     }
     
-    const seconds = isHours ? value * 3600 : value;
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    // Firestoreではhoursフィールドを使用（時間単位）
+    // durationフィールドは秒単位
+    let totalSeconds: number;
+    
+    if (isHours) {
+      // hoursフィールドの場合（時間を秒に変換）
+      totalSeconds = value * 3600;
+    } else {
+      // durationフィールドの場合（既に秒単位）
+      totalSeconds = value;
+    }
+    
+    // 異常に大きな値の場合は補正（1000時間以上は異常値として扱う）
+    if (totalSeconds > 3600000) {
+      // 秒として扱われているものを時間として再計算
+      totalSeconds = value;
+    }
+    
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    
+    // 異常値のチェック（24時間を超える場合は警告）
+    if (hours > 24) {
+      console.warn(`Unusual duration detected: ${hours}h ${minutes}m for value ${value} (isHours: ${isHours})`);
+    }
+    
     return `${hours}h ${minutes}m`;
   };
 
-  // Helper function to format entry time
-  const formatEntryTime = (entry: TimeEntry) => {
-    // 開始時刻がある場合（タイマー実行中）
-    if (entry.startTime) {
-      let startDate: Date;
-      if (typeof entry.startTime === 'string') {
-        startDate = new Date(entry.startTime);
-      } else {
-        startDate = new Date(entry.startTime);
-      }
-      return startDate.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      });
-    }
-    
-    // 作成時刻を表示
-    if (entry.createdAt) {
-      let createdDate: Date;
-      if (typeof entry.createdAt === 'string') {
-        createdDate = new Date(entry.createdAt);
-      } else {
-        createdDate = new Date(entry.createdAt);
-      }
-      return createdDate.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-      });
-    }
-    
-    return '-';
-  };
 
   // タイマーの経過時間を計算
   const getElapsedTime = (startTime: string | Date | undefined) => {
@@ -685,7 +674,7 @@ const TimeTracking = () => {
               <Table variant="simple">
                 <Thead>
                   <Tr>
-                    <Th>Time</Th>
+                    <Th>Date</Th>
                     <Th>Project</Th>
                     <Th>Task</Th>
                     <Th>Notes</Th>
@@ -696,11 +685,11 @@ const TimeTracking = () => {
                 <Tbody>
                   {getTodayEntries().map(entry => (
                     <Tr key={entry._id || entry.id}>
-                      <Td>{formatEntryTime(entry)}</Td>
-                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
+                      <Td>{entry.date}</Td>
+                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                       <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                      <Td>{entry.notes || '-'}</Td>
-                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
+                      <Td>{entry.notes || entry.description || '-'}</Td>
+                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime)) : formatDuration(entry.hours ? entry.hours * 3600 : entry.duration, false)}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -750,10 +739,10 @@ const TimeTracking = () => {
                   {getWeekEntries().map(entry => (
                     <Tr key={entry._id || entry.id}>
                       <Td>{entry.date}</Td>
-                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
+                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                       <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                      <Td>{entry.notes || '-'}</Td>
-                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
+                      <Td>{entry.notes || entry.description || '-'}</Td>
+                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime)) : formatDuration(entry.hours ? entry.hours * 3600 : entry.duration, false)}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -803,10 +792,10 @@ const TimeTracking = () => {
                   {getMonthEntries().map(entry => (
                     <Tr key={entry._id || entry.id}>
                       <Td>{entry.date}</Td>
-                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
+                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                       <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                      <Td>{entry.notes || '-'}</Td>
-                      <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
+                      <Td>{entry.notes || entry.description || '-'}</Td>
+                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime)) : formatDuration(entry.hours ? entry.hours * 3600 : entry.duration, false)}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton

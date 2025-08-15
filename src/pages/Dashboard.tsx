@@ -43,9 +43,19 @@ const Dashboard = () => {
   
   // 今日の時間
   const todayHours = useMemo(() => {
-    return timeEntries
-      .filter(entry => entry.date === today)
-      .reduce((total, entry) => total + (entry.duration || 0), 0);
+    const todayEntries = timeEntries.filter(entry => entry.date === today);
+    
+    // デバッグログ
+    if (todayEntries.length > 0) {
+      console.log('Today entries:', todayEntries.map(e => ({
+        date: e.date,
+        hours: e.hours,
+        duration: e.duration,
+        project: e.project?.name || e.projectName
+      })));
+    }
+    
+    return todayEntries.reduce((total, entry) => total + (entry.hours ? entry.hours * 3600 : (entry.duration || 0)), 0);
   }, [timeEntries, today]);
   
   // 今週の時間
@@ -59,7 +69,7 @@ const Dashboard = () => {
         const entryDate = new Date(entry.date);
         return entryDate >= startOfWeek;
       })
-      .reduce((total, entry) => total + (entry.duration || 0), 0);
+      .reduce((total, entry) => total + (entry.hours ? entry.hours * 3600 : (entry.duration || 0)), 0);
   }, [timeEntries]);
   
   // 今月の時間
@@ -72,14 +82,17 @@ const Dashboard = () => {
         const entryDate = new Date(entry.date);
         return entryDate >= startOfMonth;
       })
-      .reduce((total, entry) => total + (entry.duration || 0), 0);
+      .reduce((total, entry) => total + (entry.hours ? entry.hours * 3600 : (entry.duration || 0)), 0);
   }, [timeEntries]);
   
   // 未請求金額（例として時間 * 100ドルで計算）
   const unbilledAmount = useMemo(() => {
     return timeEntries
       .filter(entry => entry.isBillable)
-      .reduce((total, entry) => total + ((entry.duration || 0) / 3600) * 100, 0);
+      .reduce((total, entry) => {
+        const hours = entry.hours || ((entry.duration || 0) / 3600);
+        return total + hours * 100;
+      }, 0);
   }, [timeEntries]);
   
   // 最近の時間エントリー（最新5件）
@@ -109,10 +122,13 @@ const Dashboard = () => {
   // プロジェクトの進捗状況
   const projectProgress = useMemo(() => {
     return projects.map(project => {
-      // プロジェクトの時間を集計
-      const projectHours = timeEntries
-        .filter(entry => entry.project?.id === project.id)
-        .reduce((total, entry) => total + (entry.duration || 0), 0);
+      // プロジェクトの時間を集計（秒単位）
+      const projectSeconds = timeEntries
+        .filter(entry => (entry.project?.id === project.id) || (entry.projectId === project.id))
+        .reduce((total, entry) => total + (entry.hours ? entry.hours * 3600 : (entry.duration || 0)), 0);
+      
+      // 時間に変換
+      const projectHours = projectSeconds / 3600;
       
       // 予算に対する進捗率を計算（仮定として、予算が時間または金額で設定されているものとする）
       let progress = 0;
@@ -257,8 +273,8 @@ const Dashboard = () => {
                   {recentTimeEntries.map(entry => (
                     <Tr key={entry.id}>
                       <Td>{formatDate(entry.date)}</Td>
-                      <Td>{entry.project?.name || 'Unknown Project'}</Td>
-                      <Td>{formatHours(entry.duration || 0)}</Td>
+                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
+                      <Td>{formatHours(entry.hours ? entry.hours * 3600 : (entry.duration || 0))}</Td>
                       <Td>
                         {entry.isRunning ? (
                           <Badge colorScheme="green">Running</Badge>
