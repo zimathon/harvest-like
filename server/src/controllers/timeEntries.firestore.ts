@@ -97,11 +97,12 @@ export const getMyTimeEntries = async (req: AuthRequestFirestore, res: Response)
       entries.map(async (entry) => {
         const project = await Project.findById(entry.projectId);
         
-        // Debug logging
-        if (entry.hours && entry.hours > 24) {
-          console.log('⚠️ Unusual hours value detected:', {
+        // Debug logging for unusual duration values
+        const hours = entry.duration / 3600; // Convert seconds to hours
+        if (hours > 24) {
+          console.log('⚠️ Unusual duration detected:', {
             id: entry.id,
-            hours: entry.hours,
+            hours: hours,
             duration: entry.duration,
             date: entry.date
           });

@@ -413,7 +413,7 @@ const Reports = () => {
                                     </Badge>
                                   </Td>
                                   <Td>{entry.projectName}</Td>
-                                  <Td>{entry.task || '-'}</Td>
+                                  <Td>{typeof entry.task === 'string' ? entry.task : (entry.task ? 'Task' : '-')}</Td>
                                   <Td isNumeric>{entry.calculatedHours.toFixed(2)}</Td>
                                   <Td>
                                     <Badge colorScheme={entry.isBillable ? 'green' : 'gray'}>
