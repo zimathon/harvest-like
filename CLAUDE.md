@@ -62,3 +62,52 @@ const db = new Firestore({ projectId });
 
 // 実行: GOOGLE_CLOUD_PROJECT=harvest-a82c0 node update-user-role.mjs
 ```
+
+## GCP認証の仕組み
+
+### Application Default Credentials (ADC)
+- **設定ファイル**: `~/.config/gcloud/application_default_credentials.json`
+- **認証タイプ**: `authorized_user`（ユーザー認証）
+- **作成方法**: `gcloud auth application-default login`
+
+### 認証が長期間有効な理由
+1. **リフレッシュトークン**: ADCファイルにリフレッシュトークンが含まれている
+2. **自動更新**: アクセストークンが期限切れになると自動的に新しいトークンを取得
+3. **長期有効性**: リフレッシュトークンは基本的に無期限（または非常に長期間）有効
+
+### 認証情報の優先順位
+アプリケーションは以下の順序で認証情報を探します：
+1. 環境変数 `GOOGLE_APPLICATION_CREDENTIALS`
+2. Application Default Credentials (`~/.config/gcloud/application_default_credentials.json`)
+3. gcloudのデフォルト設定
+4. GCE/Cloud Runなどのメタデータサービス
+
+### 認証関連コマンド
+```bash
+# 現在の認証状態を確認
+gcloud auth list
+
+# アクティブなアカウントを確認
+gcloud config get-value account
+
+# ADCの状態を確認
+gcloud auth application-default print-access-token
+
+# ADCをリセット（認証をやり直す場合）
+gcloud auth application-default revoke
+gcloud auth application-default login
+
+# 別のアカウントに切り替え
+gcloud config set account [ACCOUNT_EMAIL]
+```
+
+### セキュリティ考慮事項
+- ADCファイルは権限600で保護されている
+- 複数プロジェクトで作業する場合は、プロジェクトごとにサービスアカウントの使用を推奨
+- 定期的な認証情報の更新を推奨
+
+### Cloud Runでの認証
+Cloud Run上では、サービスアカウントが自動的に使用される：
+- デフォルトのCompute Engine サービスアカウント
+- または、カスタムサービスアカウントを指定可能
+- IAMロールで適切な権限を付与する必要あり
