@@ -31,7 +31,9 @@ import {
   Stat,
   StatLabel,
   StatNumber,
-  StatGroup
+  StatGroup,
+  Badge,
+  useToast
 } from '@chakra-ui/react'
 import { useState, useCallback, useMemo } from 'react'
 import { useProjects } from '../contexts/ProjectContext'
@@ -40,72 +42,47 @@ import { useAuth } from '../contexts/AuthContext'
 import timeEntryService from '../services/timeEntryService'
 import { TimeEntry } from '../types'
 
+// Helper function to format date with day of week
+const formatDateWithDay = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return {
+    formatted: `${year}/${month}/${day}`,
+    dayOfWeek: days[date.getDay()],
+    isWeekend: date.getDay() === 0 || date.getDay() === 6
+  };
+}
+
 const Reports = () => {
   const { projects, isLoading: projectsLoading, error: projectsError } = useProjects();
   const { users, isLoading: usersLoading, error: usersError } = useUsers();
   const { user } = useAuth();
+  const toast = useToast();
   
-  const [dateRange, setDateRange] = useState('thisMonth');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1-12
   const [selectedProject, setSelectedProject] = useState('all');
   const [selectedUser, setSelectedUser] = useState('all');
   const [reportData, setReportData] = useState<TimeEntry[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportGenerated, setReportGenerated] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
 
   // Calculate date range
   const getDateRange = useCallback(() => {
-    const today = new Date();
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
-    
-    switch (dateRange) {
-      case 'today':
-        return {
-          startDate: startOfDay.toISOString().split('T')[0],
-          endDate: endOfDay.toISOString().split('T')[0]
-        };
-      case 'thisWeek': {
-        const dayOfWeek = today.getDay();
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - dayOfWeek);
-        return {
-          startDate: startOfWeek.toISOString().split('T')[0],
-          endDate: endOfDay.toISOString().split('T')[0]
-        };
-      }
-      case 'lastWeek': {
-        const dayOfWeek = today.getDay();
-        const startOfLastWeek = new Date(today);
-        startOfLastWeek.setDate(today.getDate() - dayOfWeek - 7);
-        const endOfLastWeek = new Date(startOfLastWeek);
-        endOfLastWeek.setDate(startOfLastWeek.getDate() + 6);
-        return {
-          startDate: startOfLastWeek.toISOString().split('T')[0],
-          endDate: endOfLastWeek.toISOString().split('T')[0]
-        };
-      }
-      case 'thisMonth': {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        return {
-          startDate: startOfMonth.toISOString().split('T')[0],
-          endDate: endOfDay.toISOString().split('T')[0]
-        };
-      }
-      case 'lastMonth': {
-        const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-        return {
-          startDate: startOfLastMonth.toISOString().split('T')[0],
-          endDate: endOfLastMonth.toISOString().split('T')[0]
-        };
-      }
-      default:
-        return {
-          startDate: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0],
-          endDate: endOfDay.toISOString().split('T')[0]
-        };
-    }
-  }, [dateRange]);
+    // Always use selected year and month
+    const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+    const endOfMonth = new Date(selectedYear, selectedMonth, 0);
+    return {
+      startDate: startOfMonth.toISOString().split('T')[0],
+      endDate: endOfMonth.toISOString().split('T')[0]
+    };
+  }, [selectedYear, selectedMonth]);
 
   // Generate report
   const generateReport = useCallback(async () => {
@@ -127,6 +104,15 @@ const Reports = () => {
       // Fetch time entries based on user role
       const entries = await timeEntryService.getMyTimeEntries(params);
       
+      // デバッグログ
+      console.log('Report entries:', entries.slice(0, 3).map(e => ({
+        date: e.date,
+        hours: e.hours,
+        duration: e.duration,
+        project: e.project?.name || e.projectName,
+        isBillable: e.isBillable
+      })));
+      
       setReportData(entries);
       setReportGenerated(true);
     } catch (error) {
@@ -134,7 +120,7 @@ const Reports = () => {
     } finally {
       setIsGenerating(false);
     }
-  }, [dateRange, selectedProject, selectedUser, user, getDateRange]);
+  }, [selectedProject, selectedUser, user, getDateRange]);
 
   // Aggregate data by project
   const projectSummary = useMemo(() => {
@@ -150,9 +136,11 @@ const Reports = () => {
         };
       }
       
-      acc[projectId].totalHours += (entry.duration || 0) / 3600; // Convert seconds to hours
+      // hoursフィールドがある場合はそれを使用、なければdurationを秒から時間に変換
+      const hours = entry.hours || ((entry.duration || 0) / 3600);
+      acc[projectId].totalHours += hours;
       if (entry.isBillable) {
-        acc[projectId].billableHours += (entry.duration || 0) / 3600; // Convert seconds to hours
+        acc[projectId].billableHours += hours;
       }
       acc[projectId].entries += 1;
       acc[projectId].users.add(entry.userId);
@@ -166,6 +154,25 @@ const Reports = () => {
     }));
   }, [reportData]);
 
+  // Daily entries sorted by date
+  const dailyEntries = useMemo(() => {
+    return reportData
+      .map(entry => {
+        const hours = entry.hours || ((entry.duration || 0) / 3600);
+        return {
+          ...entry,
+          calculatedHours: hours,
+          projectName: entry.project?.name || entry.projectName || 'Unknown'
+        };
+      })
+      .sort((a, b) => {
+        // Sort by date (descending), then by project name
+        const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        return a.projectName.localeCompare(b.projectName);
+      });
+  }, [reportData]);
+
   // Calculate total statistics
   const totalStats = useMemo(() => {
     return projectSummary.reduce((acc, project) => {
@@ -175,6 +182,69 @@ const Reports = () => {
       return acc;
     }, { totalHours: 0, billableHours: 0, totalProjects: 0 });
   }, [projectSummary]);
+
+  // Export to CSV function
+  const exportToCSV = useCallback(() => {
+    if (!reportGenerated || reportData.length === 0) {
+      toast({
+        title: 'No data to export',
+        description: 'Please generate a report first',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true
+      });
+      return;
+    }
+
+    let csvContent = '';
+    let filename = '';
+
+    // Export based on active tab
+    if (activeTab === 1) {
+      // Daily Breakdown
+      csvContent = 'Date,Day,Project,Task,Hours,Type\n';
+      dailyEntries.forEach(entry => {
+        const dateInfo = formatDateWithDay(entry.date);
+        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.projectName}","${entry.task || '-'}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
+      });
+      filename = 'daily-breakdown-report.csv';
+    } else if (activeTab === 2) {
+      // Project Summary
+      csvContent = 'Project,Total Hours,Billable Hours,Non-Billable Hours,Billable %,Team Members\n';
+      projectSummary.forEach(project => {
+        const billablePercentage = project.totalHours > 0 ? (project.billableHours / project.totalHours) * 100 : 0;
+        csvContent += `"${project.project.name}",${project.totalHours.toFixed(2)},${project.billableHours.toFixed(2)},${(project.totalHours - project.billableHours).toFixed(2)},${billablePercentage.toFixed(0)}%,${project.userCount}\n`;
+      });
+      filename = 'project-summary-report.csv';
+    } else {
+      // Time Summary - Export raw data
+      csvContent = 'Date,Project,Task,Notes,Hours,Billable\n';
+      reportData.forEach(entry => {
+        const hours = entry.hours || ((entry.duration || 0) / 3600);
+        csvContent += `"${entry.date}","${entry.project?.name || entry.projectName || 'Unknown'}","${entry.task || '-'}","${entry.notes || entry.description || '-'}",${hours.toFixed(2)},${entry.isBillable ? 'Yes' : 'No'}\n`;
+      });
+      filename = 'time-entries-report.csv';
+    }
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: 'Export successful',
+      description: `Report exported as ${filename}`,
+      status: 'success',
+      duration: 3000,
+      isClosable: true
+    });
+  }, [reportGenerated, reportData, activeTab, dailyEntries, projectSummary]);
 
   if (projectsLoading || usersLoading) {
     return (
@@ -201,17 +271,25 @@ const Reports = () => {
         <Card>
           <CardBody>
             <Heading size="md" mb={4}>Report Parameters</Heading>
-            <Grid templateColumns="repeat(3, 1fr)" gap={4}>
+            <Grid templateColumns="repeat(4, 1fr)" gap={4}>
               <GridItem>
                 <FormControl>
-                  <FormLabel>Date Range</FormLabel>
-                  <Select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-                    <option value="today">Today</option>
-                    <option value="thisWeek">This Week</option>
-                    <option value="lastWeek">Last Week</option>
-                    <option value="thisMonth">This Month</option>
-                    <option value="lastMonth">Last Month</option>
-                    <option value="custom">Custom Range</option>
+                  <FormLabel>Year</FormLabel>
+                  <Select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}>
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </Select>
+                </FormControl>
+              </GridItem>
+              
+              <GridItem>
+                <FormControl>
+                  <FormLabel>Month</FormLabel>
+                  <Select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                      <option key={month} value={month}>{month}</option>
+                    ))}
                   </Select>
                 </FormControl>
               </GridItem>
@@ -250,14 +328,21 @@ const Reports = () => {
               >
                 Generate Report
               </Button>
-              <Button variant="outline">Export</Button>
+              <Button 
+                variant="outline"
+                onClick={exportToCSV}
+                isDisabled={!reportGenerated}
+              >
+                Export CSV
+              </Button>
             </HStack>
           </CardBody>
         </Card>
         
-        <Tabs variant="enclosed">
+        <Tabs variant="enclosed" onChange={(index) => setActiveTab(index)}>
           <TabList>
             <Tab>Time Summary</Tab>
+            <Tab>Daily Breakdown</Tab>
             <Tab>Project Summary</Tab>
             <Tab>Team Summary</Tab>
             <Tab>Expenses</Tab>
@@ -288,6 +373,59 @@ const Reports = () => {
                           </Stat>
                         </StatGroup>
                       </>
+                    )}
+                  </VStack>
+                </CardBody>
+              </Card>
+            </TabPanel>
+            
+            <TabPanel>
+              <Card>
+                <CardBody>
+                  <VStack spacing={4} align="stretch">
+                    <Heading size="md">Daily Breakdown</Heading>
+                    {!reportGenerated ? (
+                      <Text>No data available. Please generate a report using the parameters above.</Text>
+                    ) : dailyEntries.length === 0 ? (
+                      <Text>No time entries found for the selected criteria.</Text>
+                    ) : (
+                      <TableContainer>
+                        <Table variant="simple">
+                          <Thead>
+                            <Tr>
+                              <Th>Date</Th>
+                              <Th>Day</Th>
+                              <Th>Project</Th>
+                              <Th>Task</Th>
+                              <Th isNumeric>Hours</Th>
+                              <Th>Type</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {dailyEntries.map((entry, index) => {
+                              const dateInfo = formatDateWithDay(entry.date);
+                              return (
+                                <Tr key={`${entry.id || index}`} bg={dateInfo.isWeekend ? 'gray.50' : undefined}>
+                                  <Td>{dateInfo.formatted}</Td>
+                                  <Td>
+                                    <Badge colorScheme={dateInfo.isWeekend ? 'purple' : 'blue'}>
+                                      {dateInfo.dayOfWeek}
+                                    </Badge>
+                                  </Td>
+                                  <Td>{entry.projectName}</Td>
+                                  <Td>{entry.task || '-'}</Td>
+                                  <Td isNumeric>{entry.calculatedHours.toFixed(2)}</Td>
+                                  <Td>
+                                    <Badge colorScheme={entry.isBillable ? 'green' : 'gray'}>
+                                      {entry.isBillable ? 'Billable' : 'Non-Billable'}
+                                    </Badge>
+                                  </Td>
+                                </Tr>
+                              );
+                            })}
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
                     )}
                   </VStack>
                 </CardBody>
