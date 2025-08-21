@@ -3,6 +3,9 @@ import dotenv from 'dotenv';
 import express, { NextFunction, Request, Response } from 'express';
 import morgan from 'morgan';
 
+// Load environment variables (dotenv.config() は一度だけ呼び出す)
+dotenv.config(); // .env ファイルを読み込む
+
 // Import Firestore routes
 import authRoutesFirestore from './routes/auth.firestore.js';
 import usersRoutesFirestore from './routes/users.firestore.js';
@@ -15,12 +18,9 @@ import reportsRoutesFirestore from './routes/reports.firestore.js';
 
 // Initialize Firestore (for local development)
 import { initializeFirestore } from './config/firestore-local.js';
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
   initializeFirestore();
 }
-
-// Load environment variables (dotenv.config() は一度だけ呼び出す)
-dotenv.config(); // .env ファイルを読み込む
 
 const app = express();
 
