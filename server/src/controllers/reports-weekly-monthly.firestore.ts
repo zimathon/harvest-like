@@ -65,7 +65,7 @@ export const getWeeklyTimeReport = async (req: AuthRequestFirestore, res: Respon
       
       if (dailyData[dateKey]) {
         // Use hours if available, otherwise convert duration from seconds
-        const hours = entry.hours || (entry.duration ? entry.duration / 3600 : 0);
+        const hours = (entry as any).hours || (entry.duration ? entry.duration / 3600 : 0);
         dailyData[dateKey].totalHours += hours;
         if (entry.isBillable) {
           dailyData[dateKey].billableHours += hours;
@@ -78,13 +78,13 @@ export const getWeeklyTimeReport = async (req: AuthRequestFirestore, res: Respon
     
     // Calculate weekly totals
     const totalHours = timeEntries.reduce((sum, entry) => {
-      return sum + (entry.hours || (entry.duration ? entry.duration / 3600 : 0));
+      return sum + ((entry as any).hours || (entry.duration ? entry.duration / 3600 : 0));
     }, 0);
     const billableHours = timeEntries.filter(e => e.isBillable).reduce((sum, entry) => {
-      return sum + (entry.hours || (entry.duration ? entry.duration / 3600 : 0));
+      return sum + ((entry as any).hours || (entry.duration ? entry.duration / 3600 : 0));
     }, 0);
     const nonBillableHours = timeEntries.filter(e => !e.isBillable).reduce((sum, entry) => {
-      return sum + (entry.hours || (entry.duration ? entry.duration / 3600 : 0));
+      return sum + ((entry as any).hours || (entry.duration ? entry.duration / 3600 : 0));
     }, 0);
     
     const weeklyTotal = {
@@ -163,7 +163,7 @@ export const getMonthlyTimeReport = async (req: AuthRequestFirestore, res: Respo
         };
       }
       
-      const hours = entry.hours || (entry.duration ? entry.duration / 3600 : 0);
+      const hours = (entry as any).hours || (entry.duration ? entry.duration / 3600 : 0);
       weeklyData[weekKey].totalHours += hours;
       if (entry.isBillable) {
         weeklyData[weekKey].billableHours += hours;
@@ -183,13 +183,13 @@ export const getMonthlyTimeReport = async (req: AuthRequestFirestore, res: Respo
     
     // Calculate monthly totals and statistics
     const totalHours = timeEntries.reduce((sum, entry) => {
-      return sum + (entry.hours || (entry.duration ? entry.duration / 3600 : 0));
+      return sum + ((entry as any).hours || (entry.duration ? entry.duration / 3600 : 0));
     }, 0);
     const billableHours = timeEntries.filter(e => e.isBillable).reduce((sum, entry) => {
-      return sum + (entry.hours || (entry.duration ? entry.duration / 3600 : 0));
+      return sum + ((entry as any).hours || (entry.duration ? entry.duration / 3600 : 0));
     }, 0);
     const nonBillableHours = timeEntries.filter(e => !e.isBillable).reduce((sum, entry) => {
-      return sum + (entry.hours || (entry.duration ? entry.duration / 3600 : 0));
+      return sum + ((entry as any).hours || (entry.duration ? entry.duration / 3600 : 0));
     }, 0);
     
     // Get unique working days
