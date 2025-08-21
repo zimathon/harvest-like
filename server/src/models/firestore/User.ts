@@ -18,11 +18,20 @@ export class UserModel {
   private collection: any;
   
   constructor() {
-    this.db = getFirestore();
-    this.collection = this.db.collection(collections.users);
+    // Lazy initialization - db will be set on first use
+  }
+
+  private ensureDb() {
+    if (!this.db) {
+      this.db = getFirestore();
+      this.collection = this.db.collection(collections.users);
+      console.log('User model DB initialized with project:', this.db.projectId);
+      console.log('DB settings:', this.db._settings);
+    }
   }
 
   async create(userData: UserCreateData | UserMigrationData): Promise<IUser> {
+    this.ensureDb();
     const now = Timestamp.now();
     const hashedPassword = 'skipHash' in userData && userData.skipHash 
       ? userData.password 
@@ -43,6 +52,7 @@ export class UserModel {
   }
 
   async findById(id: string): Promise<IUser | null> {
+    this.ensureDb();
     const doc = await this.collection.doc(id).get();
     if (!doc.exists) {
       return null;
@@ -54,6 +64,7 @@ export class UserModel {
   }
 
   async findByEmail(email: string): Promise<IUser | null> {
+    this.ensureDb();
     const snapshot = await this.collection.where('email', '==', email).limit(1).get();
     if (snapshot.empty) {
       return null;
@@ -66,6 +77,7 @@ export class UserModel {
   }
 
   async update(id: string, updateData: Partial<IUser>): Promise<IUser | null> {
+    this.ensureDb();
     const docRef = this.collection.doc(id);
     const doc = await docRef.get();
     
@@ -92,6 +104,7 @@ export class UserModel {
   }
 
   async delete(id: string): Promise<boolean> {
+    this.ensureDb();
     try {
       await this.collection.doc(id).delete();
       return true;
@@ -101,6 +114,7 @@ export class UserModel {
   }
 
   async list(filters?: { role?: string; isActive?: boolean }): Promise<IUser[]> {
+    this.ensureDb();
     let query = this.collection as any;
     
     if (filters?.role) {
@@ -120,6 +134,7 @@ export class UserModel {
 
   async findByIds(ids: string[]): Promise<IUser[]> {
     if (!ids.length) return [];
+    this.ensureDb();
     
     // Firestore 'in' operator supports max 30 values at once
     const chunks: string[][] = [];
