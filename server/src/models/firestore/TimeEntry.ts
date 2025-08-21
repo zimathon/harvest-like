@@ -84,8 +84,8 @@ export class TimeEntryModel {
       ...doc.data()
     } as ITimeEntry));
 
-    // Populate all entries
-    return Promise.all(entries.map(entry => this.populate(entry, ['project', 'user'])));
+    // Don't populate here - let controller handle batch fetching
+    return entries;
   }
 
   async findAll(filters?: {
@@ -119,8 +119,8 @@ export class TimeEntryModel {
       ...doc.data()
     } as ITimeEntry));
 
-    // Populate all entries
-    return Promise.all(entries.map(entry => this.populate(entry, ['project', 'user'])));
+    // Don't populate here - let controller handle batch fetching
+    return entries;
   }
 
   async findRunning(userId: string): Promise<ITimeEntry[]> {

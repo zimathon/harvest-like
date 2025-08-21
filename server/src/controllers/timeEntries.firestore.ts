@@ -38,20 +38,28 @@ export const getTimeEntries = async (req: AuthRequestFirestore, res: Response): 
 
     const entries = await TimeEntry.findAll(filters);
 
-    // Populate user and project names
-    const entriesWithDetails = await Promise.all(
-      entries.map(async (entry) => {
-        const [user, project] = await Promise.all([
-          User.findById(entry.userId),
-          Project.findById(entry.projectId)
-        ]);
-        return {
-          ...entry,
-          userName: user?.name || 'Unknown User',
-          projectName: project?.name || 'Unknown Project'
-        };
-      })
-    );
+    // Batch fetch all users and projects
+    const userIds = [...new Set(entries.map(e => e.userId).filter(Boolean))];
+    const projectIds = [...new Set(entries.map(e => e.projectId).filter(Boolean))];
+    
+    const [users, projects] = await Promise.all([
+      User.findByIds(userIds),
+      Project.findByIds(projectIds)
+    ]);
+    
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const projectMap = new Map(projects.map(p => [p.id, p]));
+
+    // Map names without individual queries
+    const entriesWithDetails = entries.map((entry) => {
+      const user = userMap.get(entry.userId);
+      const project = projectMap.get(entry.projectId);
+      return {
+        ...entry,
+        userName: user?.name || 'Unknown User',
+        projectName: project?.name || 'Unknown Project'
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -92,28 +100,31 @@ export const getMyTimeEntries = async (req: AuthRequestFirestore, res: Response)
 
     const entries = await TimeEntry.findByUser(req.user.id, filters);
 
-    // Populate project names
-    const entriesWithProjects = await Promise.all(
-      entries.map(async (entry) => {
-        const project = await Project.findById(entry.projectId);
-        
-        // Debug logging for unusual duration values
-        const hours = entry.duration / 3600; // Convert seconds to hours
-        if (hours > 24) {
-          console.log('⚠️ Unusual duration detected:', {
-            id: entry.id,
-            hours: hours,
-            duration: entry.duration,
-            date: entry.date
-          });
-        }
-        
-        return {
-          ...entry,
-          projectName: project?.name || 'Unknown Project'
-        };
-      })
-    );
+    // Batch fetch all projects
+    const projectIds = [...new Set(entries.map(e => e.projectId).filter(Boolean))];
+    const projects = await Project.findByIds(projectIds);
+    const projectMap = new Map(projects.map(p => [p.id, p]));
+
+    // Map project names without individual queries
+    const entriesWithProjects = entries.map((entry) => {
+      const project = projectMap.get(entry.projectId);
+      
+      // Debug logging for unusual duration values
+      const hours = entry.duration / 3600; // Convert seconds to hours
+      if (hours > 24) {
+        console.log('⚠️ Unusual duration detected:', {
+          id: entry.id,
+          hours: hours,
+          duration: entry.duration,
+          date: entry.date
+        });
+      }
+      
+      return {
+        ...entry,
+        projectName: project?.name || 'Unknown Project'
+      };
+    });
 
     res.status(200).json({
       success: true,

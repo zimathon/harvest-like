@@ -118,6 +118,31 @@ export class UserModel {
     }));
   }
 
+  async findByIds(ids: string[]): Promise<IUser[]> {
+    if (!ids.length) return [];
+    
+    // Firestore 'in' operator supports max 30 values at once
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) {
+      chunks.push(ids.slice(i, i + 30));
+    }
+
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const snapshot = await this.collection
+          .where('__name__', 'in', chunk)
+          .get();
+        
+        return snapshot.docs.map((doc: any) => ({
+          id: doc.id,
+          ...doc.data()
+        } as IUser));
+      })
+    );
+
+    return results.flat();
+  }
+
   async comparePassword(user: IUser, candidatePassword: string): Promise<boolean> {
     return bcrypt.compare(candidatePassword, user.password);
   }

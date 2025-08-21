@@ -136,6 +136,31 @@ export class ProjectModel {
     return projects;
   }
 
+  async findByIds(ids: string[]): Promise<IProject[]> {
+    if (!ids.length) return [];
+    
+    // Firestore 'in' operator supports max 30 values at once
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += 30) {
+      chunks.push(ids.slice(i, i + 30));
+    }
+
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const snapshot = await this.collection
+          .where('__name__', 'in', chunk)
+          .get();
+        
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as IProject));
+      })
+    );
+
+    return results.flat();
+  }
+
   async update(id: string, updateData: Partial<IProject>): Promise<IProject | null> {
     const updateFields = {
       ...updateData,
