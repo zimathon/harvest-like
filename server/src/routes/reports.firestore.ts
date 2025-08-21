@@ -2,6 +2,8 @@ import express from 'express';
 import {
   getSummaryReport,
   getTimeEntriesReport,
+  getWeeklyTimeReport,
+  getMonthlyTimeReport,
   getExpensesReport,
   getProjectsReport,
   getClientsReport
@@ -15,6 +17,8 @@ router.use(protect);
 
 router.route('/summary').get(getSummaryReport);
 router.route('/time-entries').get(getTimeEntriesReport);
+router.route('/time-entries/weekly').get(getWeeklyTimeReport);
+router.route('/time-entries/monthly').get(getMonthlyTimeReport);
 router.route('/expenses').get(getExpensesReport);
 router.route('/projects').get(getProjectsReport);
 router.route('/clients').get(getClientsReport);

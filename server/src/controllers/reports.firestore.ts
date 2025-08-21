@@ -6,6 +6,9 @@ import Invoice from '../models/firestore/Invoice.js';
 import { Client } from '../models/firestore/Client.js';
 import { AuthRequestFirestore } from '../types/firestore.js';
 
+// Re-export weekly and monthly reports from separate file
+export { getWeeklyTimeReport, getMonthlyTimeReport } from './reports-weekly-monthly.firestore.js';
+
 // @desc    Get summary report
 // @route   GET /api/v2/reports/summary
 // @access  Private
