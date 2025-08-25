@@ -122,24 +122,40 @@ const TimeTracking = () => {
     if (selectedTimeEntry) {
       setDate(selectedTimeEntry.date);
       
-      // プロジェクトIDを設定
-      const projectId = selectedTimeEntry.project?._id || selectedTimeEntry.project?.id;
-      setSelectedProjectId(projectId || '');
-      
-      // プロジェクトのタスクを取得してタスクIDを設定
-      const project = projects.find(p => (p._id || p.id) === projectId);
-      if (project && project.tasks) {
-        // タスク名からタスクIDを見つける
-        const task = project.tasks.find(t => t.name === selectedTimeEntry.task);
-        if (task) {
-          setSelectedTaskId(task._id || task.id || task.name);
+      // プロジェクトIDを設定 (projectIdフィールドを直接使用)
+      const projectId = selectedTimeEntry.projectId || selectedTimeEntry.project?._id || selectedTimeEntry.project?.id;
+      if (projectId) {
+        setSelectedProjectId(projectId);
+        
+        // プロジェクトが設定されたら、そのプロジェクトのタスクを取得
+        const project = projects.find(p => (p._id || p.id) === projectId);
+        if (project && project.tasks) {
+          // まずタスクリストを更新
+          setTasks(project.tasks);
+          
+          // タスク名からタスクIDを見つける
+          const taskName = typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name;
+          const task = project.tasks.find(t => t.name === taskName);
+          if (task) {
+            // タスクIDを少し遅延して設定（タスクリストの更新後）
+            setTimeout(() => {
+              setSelectedTaskId(task._id || task.id || task.name);
+            }, 100);
+          } else {
+            setSelectedTaskId('');
+          }
         } else {
+          setTasks([]);
           setSelectedTaskId('');
         }
+      } else {
+        setSelectedProjectId('');
+        setTasks([]);
+        setSelectedTaskId('');
       }
       
       setDuration(formatDuration(selectedTimeEntry.duration || selectedTimeEntry.hours, selectedTimeEntry.hours !== undefined));
-      setNotes(selectedTimeEntry.notes || '');
+      setNotes(selectedTimeEntry.notes || selectedTimeEntry.description || '');
     }
   }, [selectedTimeEntry, projects]);
 
@@ -529,7 +545,7 @@ const TimeTracking = () => {
               <Box p={3} bg="blue.50" borderRadius="md" border="1px" borderColor="blue.200">
                 <Flex justify="space-between" align="center">
                   <Text fontWeight="bold" color="blue.600">
-                    Editing Time Entry: {selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
+                    Editing Time Entry: {selectedTimeEntry.projectName || selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
                   </Text>
                   <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
                     Cancel Edit
@@ -543,7 +559,14 @@ const TimeTracking = () => {
                 <Select 
                   placeholder="Select project"
                   value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  onChange={(e) => {
+                    const newProjectId = e.target.value;
+                    setSelectedProjectId(newProjectId);
+                    // プロジェクトが変更されたらタスクをリセット（編集時以外）
+                    if (!selectedTimeEntry) {
+                      setSelectedTaskId('');
+                    }
+                  }}
                 >
                   {projects.map(project => (
                     <option key={project._id || project.id} value={project._id || project.id}>{project.name}</option>
@@ -555,13 +578,16 @@ const TimeTracking = () => {
                 <FormLabel>Task</FormLabel>
                 <Select 
                   placeholder="Select task"
-                  value={selectedTaskId}
+                  value={selectedTaskId || ''}
                   onChange={(e) => setSelectedTaskId(e.target.value)}
-                  isDisabled={!selectedProjectId} // プロジェクトが選択されていないとタスクは選択不可
+                  isDisabled={!selectedProjectId || tasks.length === 0} // プロジェクトが選択されていないか、タスクがない場合は選択不可
                 >
-                  {tasks.map(task => (
-                    <option key={task._id || task.id} value={task._id || task.id}>{task.name}</option>
-                  ))}
+                  {tasks.map(task => {
+                    const taskId = task._id || task.id || task.name;
+                    return (
+                      <option key={taskId} value={taskId}>{task.name}</option>
+                    );
+                  })}
                 </Select>
               </FormControl>
             </HStack>
