@@ -43,6 +43,16 @@ docker build --platform=linux/amd64 -f Dockerfile.production -t ${IMAGE_TAG} .
 echo -e "${GREEN}Pushing image to Artifact Registry...${NC}"
 docker push ${IMAGE_TAG}
 
+# Check if env-vars.yaml exists
+ENV_VARS_FILE="../server/env-vars.yaml"
+if [ -f "$ENV_VARS_FILE" ]; then
+    echo -e "${GREEN}Using environment variables from env-vars.yaml${NC}"
+    ENV_VARS_OPTION="--env-vars-file ${ENV_VARS_FILE}"
+else
+    echo -e "${YELLOW}⚠️  env-vars.yaml not found, using default environment variables${NC}"
+    ENV_VARS_OPTION="--set-env-vars NODE_ENV=${ENVIRONMENT} --set-env-vars JWT_SECRET=0aafbf8b391afe1bb826349b3045645101c5a1cf0f913c689d56ed742645866c --set-env-vars CORS_ALLOWED_ORIGINS=https://harvest-a82c0.web.app,https://harvest-a82c0.firebaseapp.com"
+fi
+
 # Deploy to Cloud Run
 echo -e "${GREEN}Deploying to Cloud Run...${NC}"
 gcloud run deploy ${SERVICE_NAME} \
@@ -50,9 +60,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --platform managed \
     --region ${REGION} \
     --allow-unauthenticated \
-    --set-env-vars "NODE_ENV=${ENVIRONMENT}" \
-    --set-env-vars "JWT_SECRET=0aafbf8b391afe1bb826349b3045645101c5a1cf0f913c689d56ed742645866c" \
-    --set-env-vars "CORS_ALLOWED_ORIGINS=https://harvest-a82c0.web.app" \
+    ${ENV_VARS_OPTION} \
     --memory 512Mi \
     --cpu 1 \
     --timeout 60 \

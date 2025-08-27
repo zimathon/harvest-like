@@ -93,18 +93,30 @@ gcloud run services update harvest-backend \
 
 ## 環境変数
 
-### バックエンド (.env.production)
+### バックエンド (server/env-vars.yaml)
+```yaml
+# Cloud Run用の環境変数設定ファイル
+CORS_ALLOWED_ORIGINS: "http://localhost:5173,https://harvest-a82c0.web.app,https://harvest-a82c0.firebaseapp.com"
+PROJECT_ID: "harvest-a82c0"
+GOOGLE_CLOUD_PROJECT: "harvest-a82c0"
+USE_FIRESTORE_EMULATOR: "false"
+```
+
+### バックエンド (.env - 開発環境用)
 ```env
-PROJECT_ID=your-gcp-project-id
-REGION=us-central1
-NODE_ENV=production
-GOOGLE_CLOUD_PROJECT=your-gcp-project-id
-CORS_ORIGIN=https://storage.googleapis.com/your-bucket-name
+PORT=5001
+MONGODB_URI=mongodb://localhost:27017/harvest-like
+JWT_SECRET=your-secret-key
+JWT_EXPIRE=7d
+CORS_ALLOWED_ORIGINS=http://localhost:5173,https://harvest-a82c0.web.app,https://harvest-a82c0.firebaseapp.com
+PROJECT_ID=harvest-a82c0
+GOOGLE_CLOUD_PROJECT=harvest-a82c0
+USE_FIRESTORE_EMULATOR=false
 ```
 
 ### フロントエンド (.env.production)
 ```env
-VITE_API_URL=https://harvest-backend-xxxxx-uc.a.run.app
+VITE_API_URL=https://harvest-backend-513826854215.asia-northeast1.run.app
 ```
 
 ## コスト削減のヒント
@@ -125,9 +137,14 @@ VITE_API_URL=https://harvest-backend-xxxxx-uc.a.run.app
 
 ### CORS エラー
 ```bash
+# env-vars.yaml を編集して許可するオリジンを追加
+vi server/env-vars.yaml
+
 # Cloud Run の環境変数を更新
+cd server
 gcloud run services update harvest-backend \
-  --update-env-vars CORS_ORIGIN=YOUR_FRONTEND_URL
+  --region asia-northeast1 \
+  --env-vars-file env-vars.yaml
 ```
 
 ### Firestore 権限エラー
