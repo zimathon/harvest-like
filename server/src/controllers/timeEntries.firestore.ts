@@ -450,6 +450,86 @@ export const startTimer = async (req: AuthRequestFirestore, res: Response): Prom
   }
 };
 
+// @desc    Resume timer for an existing time entry
+// @route   PUT /api/v2/time-entries/:id/timer/resume
+// @access  Private
+export const resumeTimer = async (req: AuthRequestFirestore, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: 'Not authorized'
+      });
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Check if entry exists and belongs to user
+    const existingEntry = await TimeEntry.findById(id);
+    if (!existingEntry) {
+      res.status(404).json({
+        success: false,
+        error: 'Time entry not found'
+      });
+      return;
+    }
+
+    if (existingEntry.userId !== req.user.id) {
+      res.status(403).json({
+        success: false,
+        error: 'Not authorized to modify this entry'
+      });
+      return;
+    }
+
+    // Stop any running timers first
+    const runningEntries = await TimeEntry.findRunning(req.user.id);
+    for (const entry of runningEntries) {
+      const endTime = Timestamp.now();
+      const duration = Math.floor((endTime.toMillis() - entry.startTime.toMillis()) / 1000);
+      await TimeEntry.update(entry.id!, {
+        endTime: endTime,
+        duration,
+        isRunning: false
+      });
+    }
+
+    // Resume the timer for the existing entry
+    // Use hours field if available (more reliable), otherwise use duration
+    let baseDuration = 0;
+    const entryWithHours = existingEntry as any;
+    if (entryWithHours.hours && entryWithHours.hours > 0) {
+      // Convert hours to seconds
+      baseDuration = Math.round(entryWithHours.hours * 3600);
+    } else if (existingEntry.duration && existingEntry.duration > 0) {
+      baseDuration = existingEntry.duration;
+    }
+    
+    const updatedEntry = await TimeEntry.update(id, {
+      startTime: Timestamp.now(),
+      endTime: null,
+      isRunning: true,
+      // Store the base duration (converted from hours if needed)
+      duration: baseDuration
+    });
+
+    // Populate the project data for the response
+    const populatedEntry = await TimeEntry.findById(id, ['project', 'user']);
+
+    res.status(200).json({
+      success: true,
+      data: populatedEntry
+    });
+  } catch (error) {
+    console.error('❌ Error resuming timer:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Server Error'
+    });
+  }
+};
+
 // @desc    Stop timer
 // @route   PUT /api/v2/time-entries/timer/stop
 // @access  Private
@@ -478,15 +558,22 @@ export const stopTimer = async (req: AuthRequestFirestore, res: Response): Promi
     const endTime = Timestamp.now();
     const startTime = runningEntry.startTime;
     
-    // Calculate duration in seconds
-    const duration = Math.floor((endTime.toMillis() - startTime.toMillis()) / 1000);
+    // Calculate duration in seconds for this session
+    const sessionDuration = Math.floor((endTime.toMillis() - startTime.toMillis()) / 1000);
+    
+    // Add session duration to the existing duration (which was preserved when resuming)
+    const existingDuration = runningEntry.duration || 0;
+    const totalDuration = existingDuration + sessionDuration;
 
-    const updatedEntry = await TimeEntry.update(runningEntry.id!, {
+    const updateData: any = {
       endTime: endTime,
-      duration,
+      duration: totalDuration,
+      hours: totalDuration / 3600, // Also update hours field for consistency
       isRunning: false,
       notes: req.body.notes || runningEntry.notes
-    });
+    };
+    
+    const updatedEntry = await TimeEntry.update(runningEntry.id!, updateData);
 
     // Populate the project data for the response
     const populatedEntry = await TimeEntry.findById(runningEntry.id!, ['project', 'user']);

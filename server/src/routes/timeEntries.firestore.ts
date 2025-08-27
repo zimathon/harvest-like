@@ -7,7 +7,8 @@ import {
   updateTimeEntry,
   deleteTimeEntry,
   startTimer,
-  stopTimer
+  stopTimer,
+  resumeTimer
 } from '../controllers/timeEntries.firestore.js';
 import { protect } from '../middleware/auth.firestore.js';
 
@@ -32,5 +33,8 @@ router
   .get(getTimeEntry)
   .put(updateTimeEntry)
   .delete(deleteTimeEntry);
+
+// Resume timer for existing entry
+router.put('/:id/timer/resume', resumeTimer);
 
 export default router;
