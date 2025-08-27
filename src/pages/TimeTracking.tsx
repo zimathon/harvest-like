@@ -66,6 +66,7 @@ const TimeTracking = () => {
     deleteTimeEntry,
     startTimer,
     stopTimer,
+    resumeTimer,
     activeEntry 
   } = useTimeEntries();
 
@@ -105,7 +106,7 @@ const TimeTracking = () => {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     
-    if (activeEntry) {
+    if (activeEntry && activeEntry.isRunning) {
       interval = setInterval(() => {
         setCurrentTime(new Date());
       }, 1000); // 1秒ごとに更新
@@ -154,7 +155,26 @@ const TimeTracking = () => {
         setSelectedTaskId('');
       }
       
-      setDuration(formatDuration(selectedTimeEntry.duration || selectedTimeEntry.hours, selectedTimeEntry.hours !== undefined));
+      // hoursフィールドを優先的に使用（より信頼できる値）
+      console.log('Setting duration for edit:', {
+        duration: selectedTimeEntry.duration, 
+        hours: selectedTimeEntry.hours,
+        entireEntry: selectedTimeEntry
+      });
+      
+      // hoursを優先的に使用（手動入力された正確な値）
+      if (selectedTimeEntry.hours !== undefined && selectedTimeEntry.hours !== null && selectedTimeEntry.hours > 0) {
+        const formatted = formatDuration(selectedTimeEntry.hours, true);
+        console.log('Using hours:', selectedTimeEntry.hours, '-> formatted:', formatted);
+        setDuration(formatted);
+      } else if (selectedTimeEntry.duration !== undefined && selectedTimeEntry.duration !== null && selectedTimeEntry.duration > 0) {
+        const formatted = formatDuration(selectedTimeEntry.duration, false);
+        console.log('Using duration (seconds):', selectedTimeEntry.duration, '-> formatted:', formatted);
+        setDuration(formatted);
+      } else {
+        console.log('No duration or hours found, setting to 0h 0m');
+        setDuration('0h 0m');
+      }
       setNotes(selectedTimeEntry.notes || selectedTimeEntry.description || '');
     }
   }, [selectedTimeEntry, projects]);
@@ -165,39 +185,34 @@ const TimeTracking = () => {
       return '0h 0m';
     }
     
+    console.log(`formatDuration called: value=${value}, isHours=${isHours}`);
+    
     // Firestoreではhoursフィールドを使用（時間単位）
     // durationフィールドは秒単位
     let totalSeconds: number;
     
     if (isHours) {
       // hoursフィールドの場合（時間を秒に変換）
-      totalSeconds = value * 3600;
+      totalSeconds = Math.round(value * 3600);
+      console.log(`Converting hours to seconds: ${value} hours -> ${totalSeconds} seconds`);
     } else {
       // durationフィールドの場合（既に秒単位）
-      totalSeconds = value;
-    }
-    
-    // 異常に大きな値の場合は補正（1000時間以上は異常値として扱う）
-    if (totalSeconds > 3600000) {
-      // 秒として扱われているものを時間として再計算
-      totalSeconds = value;
+      totalSeconds = Math.round(value);
+      console.log(`Using duration directly: ${value} seconds`);
     }
     
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     
-    // 異常値のチェック（24時間を超える場合は警告）
-    if (hours > 24) {
-      console.warn(`Unusual duration detected: ${hours}h ${minutes}m for value ${value} (isHours: ${isHours})`);
-    }
-    
-    return `${hours}h ${minutes}m`;
+    const result = `${hours}h ${minutes}m`;
+    console.log(`Result: ${result}`);
+    return result;
   };
 
 
-  // タイマーの経過時間を計算
-  const getElapsedTime = (startTime: string | Date | undefined) => {
-    if (!startTime) return 0;
+  // タイマーの経過時間を計算（リアルタイム更新対応）
+  const getElapsedTime = (startTime: string | Date | undefined, baseDuration: number = 0) => {
+    if (!startTime) return baseDuration;
     
     let start: Date;
     
@@ -206,13 +221,15 @@ const TimeTracking = () => {
     } else if (startTime instanceof Date) {
       start = startTime;
     } else {
-      return 0;
+      return baseDuration;
     }
     
+    // currentTimeを使用してリアルタイムに更新
     const now = currentTime;
     const diffMs = now.getTime() - start.getTime();
     const diffSeconds = Math.floor(diffMs / 1000);
-    return diffSeconds;
+    // Add base duration to current session time
+    return baseDuration + diffSeconds;
   };
 
   // Filter time entries for today
@@ -377,8 +394,9 @@ const TimeTracking = () => {
       projectId: selectedProject._id || selectedProject.id, // プロジェクトIDのみ送信
       task: selectedTask.name, // タスク名のみ送信
       date: date,
-      hours: totalSeconds / 3600, // Convert seconds to hours for backend
-      description: notes,
+      duration: totalSeconds, // Send duration in seconds
+      hours: totalSeconds / 3600, // Also send hours for consistency
+      notes: notes, // Use 'notes' field instead of 'description'
       isBillable: selectedTask.isBillable,
       isRunning: false,
     };
@@ -426,8 +444,37 @@ const TimeTracking = () => {
     }
   };
 
-  // タイマーを開始
+  // タイマーを開始（既存記録の再開にも対応）
   const handleStartTimer = async () => {
+    // 編集中の既存記録がある場合は、その記録のタイマーを再開
+    if (selectedTimeEntry && selectedTimeEntry.id) {
+      try {
+        // 既存記録のタイマーを再開（同じエントリーを使用）
+        await resumeTimer(selectedTimeEntry.id);
+        toast({
+          title: 'Timer Resumed',
+          description: 'Your timer has been resumed for the selected entry',
+          status: 'success',
+          duration: 2000,
+          isClosable: true
+        });
+        
+        // 編集モードをリセット
+        setSelectedTimeEntry(null);
+        return;
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Failed to resume timer',
+          status: 'error',
+          duration: 3000,
+          isClosable: true
+        });
+        return;
+      }
+    }
+    
+    // 新規タイマーの開始（既存の処理）
     if (!selectedProjectId || !selectedTaskId) {
       toast({
         title: 'Error',
@@ -628,6 +675,12 @@ const TimeTracking = () => {
               />
             </FormControl>
             
+            {selectedTimeEntry && !activeEntry && (
+              <Text fontSize="sm" color="blue.600" mb={2}>
+                📝 Editing existing entry - Click "Resume Timer" to restart the timer for this entry
+              </Text>
+            )}
+            
             <HStack spacing={4}>
               {activeEntry ? (
                 <Button 
@@ -643,7 +696,7 @@ const TimeTracking = () => {
                   colorScheme="green"
                   onClick={handleStartTimer}
                 >
-                  Start Timer
+                  {selectedTimeEntry ? 'Resume Timer' : 'Start Timer'}
                 </Button>
               )}
               
@@ -665,7 +718,7 @@ const TimeTracking = () => {
                     <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
                     {activeEntry.startTime && (
                       <Text fontSize="lg" fontWeight="bold" color="green.600">
-                        {formatDuration(getElapsedTime(activeEntry.startTime))}
+                        {formatDuration(getElapsedTime(activeEntry.startTime, activeEntry.duration || 0))}
                       </Text>
                     )}
                   </Box>
@@ -715,7 +768,7 @@ const TimeTracking = () => {
                       <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                       <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                       <Td>{entry.notes || entry.description || '-'}</Td>
-                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime)) : formatDuration(entry.hours ? entry.hours * 3600 : entry.duration, false)}</Td>
+                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -768,7 +821,7 @@ const TimeTracking = () => {
                       <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                       <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                       <Td>{entry.notes || entry.description || '-'}</Td>
-                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime)) : formatDuration(entry.hours ? entry.hours * 3600 : entry.duration, false)}</Td>
+                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -821,7 +874,7 @@ const TimeTracking = () => {
                       <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                       <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                       <Td>{entry.notes || entry.description || '-'}</Td>
-                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime)) : formatDuration(entry.hours ? entry.hours * 3600 : entry.duration, false)}</Td>
+                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
                       <Td>
                         <HStack spacing={2}>
                           <IconButton
@@ -882,7 +935,7 @@ const TimeTracking = () => {
                         <Td>{entry.project?.name || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || '-'}</Td>
-                        <Td>{entry.isRunning ? 'Running' : formatDuration(entry.duration || entry.hours, entry.hours !== undefined)}</Td>
+                        <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
                         <Td>
                           <HStack spacing={2}>
                             <IconButton
