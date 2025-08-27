@@ -198,6 +198,12 @@ class ApiClient {
     });
   }
 
+  async resumeTimer(id: string): Promise<TimeEntryResponse> {
+    return this.request<TimeEntryResponse>(`/time-entries/${id}/timer/resume`, {
+      method: 'PUT',
+    });
+  }
+
   // Projects endpoints
   async getProjects(): Promise<ProjectsResponse> {
     return this.request<ProjectsResponse>('/projects');

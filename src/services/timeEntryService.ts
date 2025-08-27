@@ -119,6 +119,18 @@ class TimeEntryService {
   }
 
   /**
+   * Resume timer for an existing time entry
+   */
+  async resumeTimer(id: string): Promise<OldTimeEntry> {
+    const response = await apiClient.resumeTimer(id);
+    
+    if (!response.data) {
+      throw new Error('Failed to resume timer');
+    }
+    return apiTimeEntryToOldTimeEntry(response.data);
+  }
+
+  /**
    * Get entries for a specific date range
    */
   async getEntriesForDateRange(startDate: string, endDate: string): Promise<OldTimeEntry[]> {

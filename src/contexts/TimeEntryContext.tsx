@@ -39,6 +39,7 @@ interface TimeEntryContextType extends TimeEntryState {
   deleteTimeEntry: (id: string) => Promise<void>;
   startTimer: (projectId: string, taskId: string, notes?: string, isBillable?: boolean) => Promise<TimeEntry>;
   stopTimer: () => Promise<TimeEntry | null>;
+  resumeTimer: (id: string) => Promise<TimeEntry>;
 }
 
 // コンテキストの作成
@@ -216,6 +217,25 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // 既存エントリーのタイマー再開
+  const resumeTimer = async (id: string) => {
+    if (!user) throw new Error('User not authenticated');
+    
+    // 既存のアクティブなタイマーを停止
+    if (state.activeEntry) {
+      await stopTimer();
+    }
+    
+    try {
+      // APIを使用してタイマーを再開
+      const resumedEntry = await timeEntryService.resumeTimer(id);
+      dispatch({ type: 'START_TIMER', payload: resumedEntry });
+      return resumedEntry;
+    } catch (error) {
+      throw new Error('Failed to resume timer');
+    }
+  };
+
   // 初回マウント時に時間記録一覧を取得
   useEffect(() => {
     if (user) {
@@ -232,7 +252,8 @@ export const TimeEntryProvider = ({ children }: { children: ReactNode }) => {
         updateTimeEntry,
         deleteTimeEntry,
         startTimer,
-        stopTimer
+        stopTimer,
+        resumeTimer
       }}
     >
       {children}
