@@ -932,7 +932,7 @@ const TimeTracking = () => {
                       .map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
-                        <Td>{entry.project?.name || 'Unknown Project'}</Td>
+                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || '-'}</Td>
                         <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>

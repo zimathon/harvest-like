@@ -108,7 +108,7 @@ export const getMyTimeEntries = async (req: AuthRequestFirestore, res: Response)
     // Map project names without individual queries
     const entriesWithProjects = entries.map((entry) => {
       const project = projectMap.get(entry.projectId);
-      
+
       // Debug logging for unusual duration values
       const hours = entry.duration / 3600; // Convert seconds to hours
       if (hours > 24) {
@@ -119,10 +119,11 @@ export const getMyTimeEntries = async (req: AuthRequestFirestore, res: Response)
           date: entry.date
         });
       }
-      
+
       return {
         ...entry,
-        projectName: project?.name || 'Unknown Project'
+        projectName: project?.name || 'Unknown Project', // Keep for backward compatibility
+        project: project || undefined // Add full project object for consistency with other endpoints
       };
     });
 
