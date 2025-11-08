@@ -57,11 +57,21 @@ jobs:
           echo "✅ Secret exists (length: $(echo "$KEY" | wc -c) bytes)"
           echo "$KEY" | jq -e .type > /dev/null && echo "✅ Valid JSON format" || echo "::error::Invalid JSON format"
           echo "Service account type: $(echo "$KEY" | jq -r .type)"
+          echo "Service account email: $(echo "$KEY" | jq -r .client_email)"
           echo "Project ID: $(echo "$KEY" | jq -r .project_id)"
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-      
+
+      - name: Verify authenticated service account
+        run: |
+          echo "Currently authenticated as:"
+          gcloud auth list
+          echo "Active account:"
+          gcloud config get-value account
+          echo "Current project:"
+          gcloud config get-value project
+
       - name: Configure Docker for Artifact Registry
         run: |
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
