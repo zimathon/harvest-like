@@ -45,7 +45,20 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-      
+
+      - name: Verify GCP_SA_KEY secret
+        env:
+          KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::GCP_SA_KEY is empty or not set"
+            exit 1
+          fi
+          echo "✅ Secret exists (length: $(echo "$KEY" | wc -c) bytes)"
+          echo "$KEY" | jq -e .type > /dev/null && echo "✅ Valid JSON format" || echo "::error::Invalid JSON format"
+          echo "Service account type: $(echo "$KEY" | jq -r .type)"
+          echo "Project ID: $(echo "$KEY" | jq -r .project_id)"
+
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
       
