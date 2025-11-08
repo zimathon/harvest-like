@@ -214,8 +214,8 @@ jobs:
     if: always()
     steps:
       - name: Send Slack Notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL }}
         uses: 8398a7/action-slack@v3
+        continue-on-error: true
         with:
           status: ${{ job.status }}
           text: |
