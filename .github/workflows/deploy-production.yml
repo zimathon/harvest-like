@@ -117,7 +117,7 @@ jobs:
     
     steps:
       - name: Notify Slack
-        if: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
         run: |
           if [ "${{ needs.build-and-deploy-backend.result }}" == "success" ] && [ "${{ needs.build-and-deploy-frontend.result }}" == "success" ]; then
             STATUS="✅ Success"
