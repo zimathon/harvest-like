@@ -4,9 +4,14 @@ import {
   Badge,
   Box,
   Button,
+  FormControl,
+  FormLabel,
   Heading,
   HStack,
+  Radio,
+  RadioGroup,
   Spinner,
+  Stack,
   Tab,
   TabList,
   TabPanel,
@@ -18,13 +23,16 @@ import {
   Text,
   Th,
   Thead,
-  Tr
+  Tr,
+  VStack
 } from '@chakra-ui/react';
 import { MdAdd, MdDelete, MdEditNote } from 'react-icons/md';
 import { useClients } from '../contexts/ClientContext.js';
+import { useSettings } from '../contexts/SettingsContext';
 
 const Manage = () => {
   const { clients, isLoading, error } = useClients();
+  const { timeFormat, setTimeFormat } = useSettings();
 
   const handleDelete = (id: string) => {
     console.log(`Delete client ${id}`);
@@ -119,7 +127,44 @@ const Manage = () => {
             <Text>Task management settings will be available here.</Text>
           </TabPanel>
           <TabPanel>
-            <Text>Account-wide settings will be available here.</Text>
+            <VStack align="stretch" spacing={6}>
+              <Box>
+                <Heading size="md" mb={4}>Account Settings</Heading>
+
+                <FormControl>
+                  <FormLabel fontSize="lg" fontWeight="semibold" mb={3}>
+                    Time Display Format
+                  </FormLabel>
+                  <Text fontSize="sm" color="gray.600" mb={4}>
+                    Choose how time durations are displayed throughout the application.
+                  </Text>
+
+                  <RadioGroup
+                    value={timeFormat}
+                    onChange={(value) => setTimeFormat(value as 'decimal' | 'hhmm')}
+                  >
+                    <Stack spacing={4}>
+                      <Radio value="hhmm">
+                        <Box>
+                          <Text fontWeight="medium">Hours and Minutes</Text>
+                          <Text fontSize="sm" color="gray.600">
+                            Display time as "2h 30m"
+                          </Text>
+                        </Box>
+                      </Radio>
+                      <Radio value="decimal">
+                        <Box>
+                          <Text fontWeight="medium">Decimal Hours</Text>
+                          <Text fontSize="sm" color="gray.600">
+                            Display time as "2.5"
+                          </Text>
+                        </Box>
+                      </Radio>
+                    </Stack>
+                  </RadioGroup>
+                </FormControl>
+              </Box>
+            </VStack>
           </TabPanel>
           <TabPanel>
             <Text>Team member management will be available here.</Text>

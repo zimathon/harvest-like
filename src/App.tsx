@@ -14,6 +14,7 @@ import Team from './pages/Team'
 import TimeTracking from './pages/TimeTracking'
 import { UserProvider } from './contexts/UserContext'
 import { InvoiceProvider } from './contexts/InvoiceContext'
+import { SettingsProvider } from './contexts/SettingsContext'
 
 // A wrapper for private routes to handle authentication and layout.
 const PrivateRoutes = () => {
@@ -38,28 +39,30 @@ function App() {
   return (
     <Router>
       <Box minH="100vh">
-        <UserProvider>
-            <InvoiceProvider>
-              <Routes>
-                <Route path="/login" element={<Login />} />
+        <SettingsProvider>
+          <UserProvider>
+              <InvoiceProvider>
+                <Routes>
+                  <Route path="/login" element={<Login />} />
 
-                <Route element={<PrivateRoutes />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/time" element={<TimeTracking />} />
-                  <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/projects" element={<Projects />} />
-                  <Route path="/team" element={<Team />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/invoices" element={<Invoices />} />
-                  <Route path="/manage" element={<Manage />} />
-                  <Route path="/clients" element={<Clients />} />
-                </Route>
+                  <Route element={<PrivateRoutes />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/time" element={<TimeTracking />} />
+                    <Route path="/expenses" element={<Expenses />} />
+                    <Route path="/projects" element={<Projects />} />
+                    <Route path="/team" element={<Team />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/invoices" element={<Invoices />} />
+                    <Route path="/manage" element={<Manage />} />
+                    <Route path="/clients" element={<Clients />} />
+                  </Route>
 
-                {/* 存在しないパスの場合はダッシュボードにリダイレクト */}
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            </InvoiceProvider>
-        </UserProvider>
+                  {/* 存在しないパスの場合はダッシュボードにリダイレクト */}
+                  <Route path="*" element={<Navigate to="/" />} />
+                </Routes>
+              </InvoiceProvider>
+          </UserProvider>
+        </SettingsProvider>
       </Box>
     </Router>
   )

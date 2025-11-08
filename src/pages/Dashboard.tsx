@@ -26,6 +26,7 @@ import {
 import { useTimeEntries } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useExpenses } from '../contexts/ExpenseContext';
+import { formatTime } from '../utils/timeFormat';
 
 const Dashboard = () => {
   const { timeEntries, fetchTimeEntries, isLoading: timeLoading } = useTimeEntries();
@@ -153,13 +154,6 @@ const Dashboard = () => {
     .slice(0, 5); // 上位5件を表示
   }, [projects, timeEntries]);
   
-  // 時間をフォーマット（秒から時間に変換）
-  const formatHours = (duration: number) => {
-    // duration is in seconds, convert to hours
-    const hours = duration / 3600;
-    return hours.toFixed(1);
-  };
-  
   // 金額をフォーマット
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -210,17 +204,17 @@ const Dashboard = () => {
           <CardBody>
             <Stat>
               <StatLabel>Today's Hours</StatLabel>
-              <StatNumber>{formatHours(todayHours)}</StatNumber>
+              <StatNumber>{formatTime(todayHours)}</StatNumber>
               <StatHelpText>{formatDate(today)}</StatHelpText>
             </Stat>
           </CardBody>
         </Card>
-        
+
         <Card>
           <CardBody>
             <Stat>
               <StatLabel>This Week</StatLabel>
-              <StatNumber>{formatHours(weekHours)}</StatNumber>
+              <StatNumber>{formatTime(weekHours)}</StatNumber>
               <StatHelpText>Week of {
                 formatDate(
                   new Date(
@@ -231,12 +225,12 @@ const Dashboard = () => {
             </Stat>
           </CardBody>
         </Card>
-        
+
         <Card>
           <CardBody>
             <Stat>
               <StatLabel>This Month</StatLabel>
-              <StatNumber>{formatHours(monthHours)}</StatNumber>
+              <StatNumber>{formatTime(monthHours)}</StatNumber>
               <StatHelpText>{
                 new Date().toLocaleString('default', { month: 'long' })
               } {new Date().getFullYear()}</StatHelpText>
@@ -274,7 +268,7 @@ const Dashboard = () => {
                     <Tr key={entry.id}>
                       <Td>{formatDate(entry.date)}</Td>
                       <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                      <Td>{formatHours(entry.hours ? entry.hours * 3600 : (entry.duration || 0))}</Td>
+                      <Td>{formatTime(entry.hours ? entry.hours * 3600 : (entry.duration || 0))}</Td>
                       <Td>
                         {entry.isRunning ? (
                           <Badge colorScheme="green">Running</Badge>
