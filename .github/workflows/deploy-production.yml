@@ -115,6 +115,41 @@ jobs:
           echo "url=$BACKEND_URL" >> $GITHUB_OUTPUT
           echo "Backend URL: $BACKEND_URL"
 
+      - name: Setup Cloud Scheduler Warmup
+        run: |
+          # Create or update Cloud Scheduler job to keep service warm
+          echo "Setting up Cloud Scheduler warmup job..."
+
+          BACKEND_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+
+          # Check if job exists
+          if gcloud scheduler jobs describe backend-warmup --location=${{ env.REGION }} &>/dev/null; then
+            echo "Updating existing warmup job..."
+            gcloud scheduler jobs update http backend-warmup \
+              --location=${{ env.REGION }} \
+              --schedule="*/10 9-18 * * MON-FRI" \
+              --uri="${BACKEND_URL}/health" \
+              --http-method=GET \
+              --time-zone="Asia/Tokyo" \
+              --attempt-deadline=10s
+          else
+            echo "Creating new warmup job..."
+            gcloud scheduler jobs create http backend-warmup \
+              --location=${{ env.REGION }} \
+              --schedule="*/10 9-18 * * MON-FRI" \
+              --uri="${BACKEND_URL}/health" \
+              --http-method=GET \
+              --time-zone="Asia/Tokyo" \
+              --attempt-deadline=10s \
+              --description="Keep backend warm during business hours (Mon-Fri 9-18 JST)"
+          fi
+
+          echo "✅ Warmup scheduler configured"
+          echo "Schedule: Every 10 minutes, Mon-Fri 9:00-18:00 JST"
+          echo "Monthly requests: ~1,300 (0.065% of free tier)"
+
   build-and-deploy-frontend:
     runs-on: ubuntu-latest
     needs: [test, build-and-deploy-backend]

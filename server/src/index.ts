@@ -16,9 +16,15 @@ import expensesRoutesFirestore from './routes/expenses.firestore.js';
 import invoicesRoutesFirestore from './routes/invoices.firestore.js';
 import reportsRoutesFirestore from './routes/reports.firestore.js';
 
-// Initialize Firestore (for local development)
+// Initialize Firestore at startup (both development and production)
 import { initializeFirestore } from './config/firestore-local.js';
-if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+import { initializeFirestore as initializeFirestoreProduction } from './config/firestore-production.js';
+
+if (process.env.NODE_ENV === 'production') {
+  console.log('🚀 Initializing Firestore for production...');
+  initializeFirestoreProduction();
+} else {
+  console.log('🚀 Initializing Firestore for development...');
   initializeFirestore();
 }
 
