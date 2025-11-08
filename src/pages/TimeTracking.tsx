@@ -310,7 +310,7 @@ const TimeTracking = () => {
 
     return timeEntries.filter(entry => {
       let entryDate: Date;
-      
+
       if (typeof entry.date === 'string') {
         entryDate = new Date(entry.date);
       } else if (entry.date && false) {
@@ -318,15 +318,31 @@ const TimeTracking = () => {
       } else {
         return false;
       }
-      
+
       // Check if date is valid
       if (isNaN(entryDate.getTime())) {
         return false;
       }
-      
+
       entryDate.setHours(0, 0, 0, 0);
       return entryDate >= firstDayOfMonth && entryDate <= lastDayOfMonth;
     });
+  };
+
+  // Calculate total duration for entries
+  const calculateTotalDuration = (entries: TimeEntry[]) => {
+    const totalSeconds = entries.reduce((total, entry) => {
+      if (entry.isRunning && entry.startTime) {
+        return total + getElapsedTime(entry.startTime, entry.duration || 0);
+      }
+      // Use hours field if available, otherwise use duration
+      if (entry.hours !== undefined && entry.hours !== null && entry.hours > 0) {
+        return total + (entry.hours * 3600);
+      }
+      return total + (entry.duration || 0);
+    }, 0);
+
+    return formatDuration(totalSeconds);
   };
 
   // Save/Update Time Entry
@@ -750,48 +766,58 @@ const TimeTracking = () => {
                 <Spinner />
               </Flex>
             ) : getTodayEntries().length > 0 ? (
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th>Date</Th>
-                    <Th>Project</Th>
-                    <Th>Task</Th>
-                    <Th>Notes</Th>
-                    <Th>Duration</Th>
-                    <Th>Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {getTodayEntries().map(entry => (
-                    <Tr key={entry._id || entry.id}>
-                      <Td>{entry.date}</Td>
-                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                      <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                      <Td>{entry.notes || entry.description || '-'}</Td>
-                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
-                      <Td>
-                        <HStack spacing={2}>
-                          <IconButton
-                            aria-label="Edit"
-                            icon={<MdEdit />}
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditEntry(entry)}
-                          />
-                          <IconButton
-                            aria-label="Delete"
-                            icon={<MdDelete />}
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="red"
-                            onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                          />
-                        </HStack>
-                      </Td>
+              <>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Date</Th>
+                      <Th>Project</Th>
+                      <Th>Task</Th>
+                      <Th>Notes</Th>
+                      <Th>Duration</Th>
+                      <Th>Actions</Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </Table>
+                  </Thead>
+                  <Tbody>
+                    {getTodayEntries().map(entry => (
+                      <Tr key={entry._id || entry.id}>
+                        <Td>{entry.date}</Td>
+                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
+                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                        <Td>{entry.notes || entry.description || '-'}</Td>
+                        <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <IconButton
+                              aria-label="Edit"
+                              icon={<MdEdit />}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditEntry(entry)}
+                            />
+                            <IconButton
+                              aria-label="Delete"
+                              icon={<MdDelete />}
+                              size="sm"
+                              variant="ghost"
+                              colorScheme="red"
+                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
+                            />
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+                <Box mt={4} p={4} bg="gray.50" borderRadius="md">
+                  <Flex justify="space-between" align="center">
+                    <Text fontWeight="bold" fontSize="lg">Total:</Text>
+                    <Text fontWeight="bold" fontSize="lg" color="blue.600">
+                      {calculateTotalDuration(getTodayEntries())}
+                    </Text>
+                  </Flex>
+                </Box>
+              </>
             ) : (
               <Text p={4}>No entries recorded today.</Text>
             )}
@@ -803,48 +829,58 @@ const TimeTracking = () => {
                 <Spinner />
               </Flex>
             ) : getWeekEntries().length > 0 ? (
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th>Date</Th>
-                    <Th>Project</Th>
-                    <Th>Task</Th>
-                    <Th>Notes</Th>
-                    <Th>Duration</Th>
-                    <Th>Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {getWeekEntries().map(entry => (
-                    <Tr key={entry._id || entry.id}>
-                      <Td>{entry.date}</Td>
-                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                      <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                      <Td>{entry.notes || entry.description || '-'}</Td>
-                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
-                      <Td>
-                        <HStack spacing={2}>
-                          <IconButton
-                            aria-label="Edit"
-                            icon={<MdEdit />}
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditEntry(entry)}
-                          />
-                          <IconButton
-                            aria-label="Delete"
-                            icon={<MdDelete />}
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="red"
-                            onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                          />
-                        </HStack>
-                      </Td>
+              <>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Date</Th>
+                      <Th>Project</Th>
+                      <Th>Task</Th>
+                      <Th>Notes</Th>
+                      <Th>Duration</Th>
+                      <Th>Actions</Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </Table>
+                  </Thead>
+                  <Tbody>
+                    {getWeekEntries().map(entry => (
+                      <Tr key={entry._id || entry.id}>
+                        <Td>{entry.date}</Td>
+                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
+                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                        <Td>{entry.notes || entry.description || '-'}</Td>
+                        <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <IconButton
+                              aria-label="Edit"
+                              icon={<MdEdit />}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditEntry(entry)}
+                            />
+                            <IconButton
+                              aria-label="Delete"
+                              icon={<MdDelete />}
+                              size="sm"
+                              variant="ghost"
+                              colorScheme="red"
+                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
+                            />
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+                <Box mt={4} p={4} bg="gray.50" borderRadius="md">
+                  <Flex justify="space-between" align="center">
+                    <Text fontWeight="bold" fontSize="lg">Total:</Text>
+                    <Text fontWeight="bold" fontSize="lg" color="blue.600">
+                      {calculateTotalDuration(getWeekEntries())}
+                    </Text>
+                  </Flex>
+                </Box>
+              </>
             ) : (
               <Text p={4}>No entries recorded this week.</Text>
             )}
@@ -856,48 +892,58 @@ const TimeTracking = () => {
                 <Spinner />
               </Flex>
             ) : getMonthEntries().length > 0 ? (
-              <Table variant="simple">
-                <Thead>
-                  <Tr>
-                    <Th>Date</Th>
-                    <Th>Project</Th>
-                    <Th>Task</Th>
-                    <Th>Notes</Th>
-                    <Th>Duration</Th>
-                    <Th>Actions</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {getMonthEntries().map(entry => (
-                    <Tr key={entry._id || entry.id}>
-                      <Td>{entry.date}</Td>
-                      <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                      <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                      <Td>{entry.notes || entry.description || '-'}</Td>
-                      <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
-                      <Td>
-                        <HStack spacing={2}>
-                          <IconButton
-                            aria-label="Edit"
-                            icon={<MdEdit />}
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEditEntry(entry)}
-                          />
-                          <IconButton
-                            aria-label="Delete"
-                            icon={<MdDelete />}
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="red"
-                            onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                          />
-                        </HStack>
-                      </Td>
+              <>
+                <Table variant="simple">
+                  <Thead>
+                    <Tr>
+                      <Th>Date</Th>
+                      <Th>Project</Th>
+                      <Th>Task</Th>
+                      <Th>Notes</Th>
+                      <Th>Duration</Th>
+                      <Th>Actions</Th>
                     </Tr>
-                  ))}
-                </Tbody>
-              </Table>
+                  </Thead>
+                  <Tbody>
+                    {getMonthEntries().map(entry => (
+                      <Tr key={entry._id || entry.id}>
+                        <Td>{entry.date}</Td>
+                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
+                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                        <Td>{entry.notes || entry.description || '-'}</Td>
+                        <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>
+                          <HStack spacing={2}>
+                            <IconButton
+                              aria-label="Edit"
+                              icon={<MdEdit />}
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditEntry(entry)}
+                            />
+                            <IconButton
+                              aria-label="Delete"
+                              icon={<MdDelete />}
+                              size="sm"
+                              variant="ghost"
+                              colorScheme="red"
+                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
+                            />
+                          </HStack>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+                <Box mt={4} p={4} bg="gray.50" borderRadius="md">
+                  <Flex justify="space-between" align="center">
+                    <Text fontWeight="bold" fontSize="lg">Total:</Text>
+                    <Text fontWeight="bold" fontSize="lg" color="blue.600">
+                      {calculateTotalDuration(getMonthEntries())}
+                    </Text>
+                  </Flex>
+                </Box>
+              </>
             ) : (
               <Text p={4}>No entries recorded this month.</Text>
             )}
@@ -932,7 +978,7 @@ const TimeTracking = () => {
                       .map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
-                        <Td>{entry.project?.name || 'Unknown Project'}</Td>
+                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || '-'}</Td>
                         <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
