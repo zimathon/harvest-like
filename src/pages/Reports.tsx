@@ -41,6 +41,7 @@ import { useUsers } from '../contexts/UserContext'
 import { useAuth } from '../contexts/AuthContext'
 import timeEntryService from '../services/timeEntryService'
 import { TimeEntry } from '../types'
+import { formatHours } from '../utils/timeFormat'
 
 // Helper function to format date with day of week
 const formatDateWithDay = (dateStr: string) => {
@@ -202,10 +203,11 @@ const Reports = () => {
     // Export based on active tab
     if (activeTab === 1) {
       // Daily Breakdown
-      csvContent = 'Date,Day,Project,Task,Hours,Type\n';
+      csvContent = 'Date,Day,Project,Task,Notes,Hours,Type\n';
       dailyEntries.forEach(entry => {
         const dateInfo = formatDateWithDay(entry.date);
-        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.projectName}","${entry.task || '-'}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
+        const notes = entry.notes || entry.description || '-';
+        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.projectName}","${entry.task || '-'}","${notes}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
       });
       filename = 'daily-breakdown-report.csv';
     } else if (activeTab === 2) {
@@ -361,11 +363,11 @@ const Reports = () => {
                         <StatGroup>
                           <Stat>
                             <StatLabel>Total Hours</StatLabel>
-                            <StatNumber>{totalStats.totalHours.toFixed(2)}</StatNumber>
+                            <StatNumber>{formatHours(totalStats.totalHours)}</StatNumber>
                           </Stat>
                           <Stat>
                             <StatLabel>Billable Hours</StatLabel>
-                            <StatNumber>{totalStats.billableHours.toFixed(2)}</StatNumber>
+                            <StatNumber>{formatHours(totalStats.billableHours)}</StatNumber>
                           </Stat>
                           <Stat>
                             <StatLabel>Total Projects</StatLabel>
@@ -414,7 +416,7 @@ const Reports = () => {
                                   </Td>
                                   <Td>{entry.projectName}</Td>
                                   <Td>{typeof entry.task === 'string' ? entry.task : (entry.task ? 'Task' : '-')}</Td>
-                                  <Td isNumeric>{entry.calculatedHours.toFixed(2)}</Td>
+                                  <Td isNumeric>{formatHours(entry.calculatedHours)}</Td>
                                   <Td>
                                     <Badge colorScheme={entry.isBillable ? 'green' : 'gray'}>
                                       {entry.isBillable ? 'Billable' : 'Non-Billable'}
@@ -462,10 +464,10 @@ const Reports = () => {
                               return (
                                 <Tr key={project.project.id}>
                                   <Td>{project.project.name}</Td>
-                                  <Td isNumeric>{project.totalHours.toFixed(2)}</Td>
-                                  <Td isNumeric>{project.billableHours.toFixed(2)}</Td>
+                                  <Td isNumeric>{formatHours(project.totalHours)}</Td>
+                                  <Td isNumeric>{formatHours(project.billableHours)}</Td>
                                   <Td isNumeric>
-                                    {(project.totalHours - project.billableHours).toFixed(2)}
+                                    {formatHours(project.totalHours - project.billableHours)}
                                   </Td>
                                   <Td>
                                     <VStack align="stretch" spacing={1}>
