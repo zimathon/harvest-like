@@ -29,11 +29,20 @@ const app = express();
 const allowedOriginsEnv = process.env.CORS_ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(',').map(origin => origin.trim()) : [];
 
+// Firebase Hosting preview URL pattern (e.g., https://PROJECT_ID--pr3-branch-name-hash.web.app)
+// プロジェクトIDを環境変数から取得して動的にパターンを構築
+const projectId = process.env.PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
+const firebasePreviewPattern = projectId
+  ? new RegExp(`^https://${projectId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}--pr[\\w-]+\\.web\\.app$`)
+  : null;
+
 // CORS オプションを設定
 const options: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // allowedOrigins に含まれているか、オリジンがない場合 (例: Postmanなどのツール) は許可
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // allowedOrigins に含まれているか、Firebase preview URL パターンにマッチするか、オリジンがない場合 (例: Postmanなどのツール) は許可
+    if (!origin ||
+        allowedOrigins.indexOf(origin) !== -1 ||
+        (origin && firebasePreviewPattern && firebasePreviewPattern.test(origin))) {
       callback(null, true);
     } else {
       console.warn(`CORS: Origin '${origin}' not allowed.`); // ログに記録
