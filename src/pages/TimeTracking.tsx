@@ -36,6 +36,7 @@ import { useTimeEntries } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext'; // useAuthをインポート
 import { TimeEntry, Task } from '../types'; // ProjectとTaskをインポート
+import { formatTime } from '../utils/timeFormat';
 
 const TimeTracking = () => {
   const { projects } = useProjects();
@@ -164,50 +165,21 @@ const TimeTracking = () => {
       
       // hoursを優先的に使用（手動入力された正確な値）
       if (selectedTimeEntry.hours !== undefined && selectedTimeEntry.hours !== null && selectedTimeEntry.hours > 0) {
-        const formatted = formatDuration(selectedTimeEntry.hours, true);
+        const formatted = formatTime(selectedTimeEntry.hours * 3600);
         console.log('Using hours:', selectedTimeEntry.hours, '-> formatted:', formatted);
         setDuration(formatted);
       } else if (selectedTimeEntry.duration !== undefined && selectedTimeEntry.duration !== null && selectedTimeEntry.duration > 0) {
-        const formatted = formatDuration(selectedTimeEntry.duration, false);
+        const formatted = formatTime(selectedTimeEntry.duration);
         console.log('Using duration (seconds):', selectedTimeEntry.duration, '-> formatted:', formatted);
         setDuration(formatted);
       } else {
         console.log('No duration or hours found, setting to 0h 0m');
-        setDuration('0h 0m');
+        setDuration(formatTime(0));
       }
       setNotes(selectedTimeEntry.notes || selectedTimeEntry.description || '');
     }
   }, [selectedTimeEntry, projects]);
 
-  // Helper function to format duration
-  const formatDuration = (value: number | undefined, isHours: boolean = false) => {
-    if (value === undefined || value === null || isNaN(value)) {
-      return '0h 0m';
-    }
-    
-    console.log(`formatDuration called: value=${value}, isHours=${isHours}`);
-    
-    // Firestoreではhoursフィールドを使用（時間単位）
-    // durationフィールドは秒単位
-    let totalSeconds: number;
-    
-    if (isHours) {
-      // hoursフィールドの場合（時間を秒に変換）
-      totalSeconds = Math.round(value * 3600);
-      console.log(`Converting hours to seconds: ${value} hours -> ${totalSeconds} seconds`);
-    } else {
-      // durationフィールドの場合（既に秒単位）
-      totalSeconds = Math.round(value);
-      console.log(`Using duration directly: ${value} seconds`);
-    }
-    
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    
-    const result = `${hours}h ${minutes}m`;
-    console.log(`Result: ${result}`);
-    return result;
-  };
 
 
   // タイマーの経過時間を計算（リアルタイム更新対応）
@@ -342,7 +314,7 @@ const TimeTracking = () => {
       return total + (entry.duration || 0);
     }, 0);
 
-    return formatDuration(totalSeconds);
+    return formatTime(totalSeconds);
   };
 
   // Save/Update Time Entry
@@ -540,7 +512,7 @@ const TimeTracking = () => {
       if (stoppedEntry) {
         toast({
           title: 'Timer Stopped',
-          description: `Recorded ${formatDuration(stoppedEntry.duration)}`,
+          description: `Recorded ${formatTime(stoppedEntry.duration)}`,
           status: 'success',
           duration: 2000,
           isClosable: true
@@ -734,7 +706,7 @@ const TimeTracking = () => {
                     <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
                     {activeEntry.startTime && (
                       <Text fontSize="lg" fontWeight="bold" color="green.600">
-                        {formatDuration(getElapsedTime(activeEntry.startTime, activeEntry.duration || 0))}
+                        {formatTime(getElapsedTime(activeEntry.startTime, activeEntry.duration || 0))}
                       </Text>
                     )}
                   </Box>
@@ -785,7 +757,7 @@ const TimeTracking = () => {
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || entry.description || '-'}</Td>
-                        <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
                           <HStack spacing={2}>
                             <IconButton
@@ -848,7 +820,7 @@ const TimeTracking = () => {
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || entry.description || '-'}</Td>
-                        <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
                           <HStack spacing={2}>
                             <IconButton
@@ -911,7 +883,7 @@ const TimeTracking = () => {
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || entry.description || '-'}</Td>
-                        <Td>{entry.isRunning ? formatDuration(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
                           <HStack spacing={2}>
                             <IconButton
@@ -981,7 +953,7 @@ const TimeTracking = () => {
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
                         <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
                         <Td>{entry.notes || '-'}</Td>
-                        <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatDuration(entry.hours, true) : formatDuration(entry.duration || 0, false))}</Td>
+                        <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
                           <HStack spacing={2}>
                             <IconButton
