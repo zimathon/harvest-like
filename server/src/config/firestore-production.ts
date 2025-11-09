@@ -3,7 +3,7 @@
  */
 
 import { Firestore } from '@google-cloud/firestore';
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 
 let db: Firestore;
 
