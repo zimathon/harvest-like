@@ -5,6 +5,15 @@ import User from '../models/firestore/User.js';
 import { AuthRequestFirestore } from '../types/firestore.js';
 import { Timestamp } from '@google-cloud/firestore';
 
+// タイムゾーンの影響を受けずにJSTで今日の日付を取得
+const getTodayDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // @desc    Get all time entries
 // @route   GET /api/v2/time-entries
 // @access  Private/Admin
@@ -427,7 +436,7 @@ export const startTimer = async (req: AuthRequestFirestore, res: Response): Prom
       projectId: req.body.projectId,
       task: req.body.task || req.body.taskId,  // Store as 'task' field for consistency
       taskId: req.body.taskId || req.body.task,
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayDateString(), // JST で今日の日付を取得
       startTime: Timestamp.now(),
       duration: 0,
       notes: req.body.notes || '',
