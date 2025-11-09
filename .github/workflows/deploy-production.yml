@@ -99,7 +99,12 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars NODE_ENV=production,PROJECT_ID=${{ env.PROJECT_ID }},USE_FIRESTORE_EMULATOR=false,JWT_SECRET=${{ secrets.JWT_SECRET }},CORS_ALLOWED_ORIGINS="${{ secrets.CORS_ALLOWED_ORIGINS }}" \
+            --update-env-vars NODE_ENV=production \
+            --update-env-vars PROJECT_ID=${{ env.PROJECT_ID }} \
+            --update-env-vars GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            --update-env-vars USE_FIRESTORE_EMULATOR=false \
+            --update-env-vars JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            --update-env-vars CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }} \
             --min-instances 0 \
             --max-instances 1 \
             --memory 256Mi \

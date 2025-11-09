@@ -33,25 +33,31 @@ fi
 echo -e "${GREEN}Setting GCP project...${NC}"
 gcloud config set project ${PROJECT_ID}
 
+# Get absolute paths before changing directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+SERVER_DIR="${PROJECT_ROOT}/server"
+ENV_VARS_FILE="${SERVER_DIR}/env-vars.yaml"
+
+# Check if env-vars.yaml exists
+if [ -f "$ENV_VARS_FILE" ]; then
+    echo -e "${GREEN}Using environment variables from ${ENV_VARS_FILE}${NC}"
+    ENV_VARS_OPTION="--env-vars-file ${ENV_VARS_FILE}"
+else
+    echo -e "${YELLOW}⚠️  env-vars.yaml not found at ${ENV_VARS_FILE}${NC}"
+    echo -e "${YELLOW}Using inline environment variables${NC}"
+    ENV_VARS_OPTION="--update-env-vars NODE_ENV=${ENVIRONMENT},PROJECT_ID=harvest-a82c0,GOOGLE_CLOUD_PROJECT=harvest-a82c0,USE_FIRESTORE_EMULATOR=false,JWT_SECRET=0aafbf8b391afe1bb826349b3045645101c5a1cf0f913c689d56ed742645866c,CORS_ALLOWED_ORIGINS=https://harvest-a82c0.web.app#https://harvest-a82c0.firebaseapp.com"
+fi
+
 # Build Docker image
 echo -e "${GREEN}Building Docker image...${NC}"
-cd ../server
+cd "${SERVER_DIR}"
 IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/api:latest"
 docker build --platform=linux/amd64 -f Dockerfile.production -t ${IMAGE_TAG} .
 
 # Push to Artifact Registry
 echo -e "${GREEN}Pushing image to Artifact Registry...${NC}"
 docker push ${IMAGE_TAG}
-
-# Check if env-vars.yaml exists
-ENV_VARS_FILE="../server/env-vars.yaml"
-if [ -f "$ENV_VARS_FILE" ]; then
-    echo -e "${GREEN}Using environment variables from env-vars.yaml${NC}"
-    ENV_VARS_OPTION="--env-vars-file ${ENV_VARS_FILE}"
-else
-    echo -e "${YELLOW}⚠️  env-vars.yaml not found, using default environment variables${NC}"
-    ENV_VARS_OPTION="--set-env-vars NODE_ENV=${ENVIRONMENT} --set-env-vars JWT_SECRET=0aafbf8b391afe1bb826349b3045645101c5a1cf0f913c689d56ed742645866c --set-env-vars CORS_ALLOWED_ORIGINS=https://harvest-a82c0.web.app,https://harvest-a82c0.firebaseapp.com"
-fi
 
 # Deploy to Cloud Run
 echo -e "${GREEN}Deploying to Cloud Run...${NC}"
