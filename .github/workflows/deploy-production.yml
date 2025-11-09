@@ -147,7 +147,7 @@ jobs:
               --uri="${BACKEND_URL}/health" \
               --http-method=GET \
               --time-zone="Asia/Tokyo" \
-              --attempt-deadline=10s
+              --attempt-deadline=30s
           else
             echo "Creating new warmup job..."
             gcloud scheduler jobs create http backend-warmup \
@@ -156,7 +156,7 @@ jobs:
               --uri="${BACKEND_URL}/health" \
               --http-method=GET \
               --time-zone="Asia/Tokyo" \
-              --attempt-deadline=10s \
+              --attempt-deadline=30s \
               --description="Keep backend warm during business hours (Mon-Fri 9-18 JST)"
           fi
 
