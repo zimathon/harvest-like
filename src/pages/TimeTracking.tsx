@@ -38,10 +38,19 @@ import { useAuth } from '../contexts/AuthContext'; // useAuthをインポート
 import { TimeEntry, Task } from '../types'; // ProjectとTaskをインポート
 import { formatTime } from '../utils/timeFormat';
 
+// タイムゾーンの影響を受けずにJSTで今日の日付を取得
+const getTodayDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const TimeTracking = () => {
   const { projects } = useProjects();
   const { user } = useAuth();
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(getTodayDateString());
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
     return localStorage.getItem('timeTracking_selectedProjectId') || '';
   });
@@ -77,14 +86,24 @@ const TimeTracking = () => {
     if (selectedProjectId) {
       const project = projects.find(p => (p._id || p.id) === selectedProjectId);
       if (project) {
-        setTasks(project.tasks || []);
+        const projectTasks = project.tasks || [];
+        setTasks(projectTasks);
+
+        // プロジェクト切替時に1つ目のタスクを自動選択（編集モードでない場合のみ）
+        // タスクが空で、かつタスクが存在する場合に自動選択
+        if (!selectedTimeEntry && projectTasks.length > 0 && !selectedTaskId) {
+          const firstTask = projectTasks[0];
+          setSelectedTaskId(firstTask._id || firstTask.id || firstTask.name);
+        }
       } else {
         setTasks([]);
+        setSelectedTaskId('');
       }
     } else {
       setTasks([]);
+      setSelectedTaskId('');
     }
-  }, [selectedProjectId, projects]);
+  }, [selectedProjectId, projects, selectedTimeEntry, selectedTaskId]);
 
   useEffect(() => {
     fetchTimeEntries();
@@ -206,7 +225,7 @@ const TimeTracking = () => {
 
   // Filter time entries for today
   const getTodayEntries = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateString();
     const todayEntries = timeEntries.filter(entry => {
       let entryDate: string;
       
@@ -419,7 +438,7 @@ const TimeTracking = () => {
       setDuration('');
       setNotes('');
       // プロジェクトとタスクは選択状態を維持
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getTodayDateString());
 
     } catch (error) {
       toast({
@@ -561,7 +580,7 @@ const TimeTracking = () => {
   // 編集をキャンセル
   const handleCancelEdit = () => {
     setSelectedTimeEntry(null);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getTodayDateString());
     // プロジェクトとタスクは保存された値に戻す
     setSelectedProjectId(localStorage.getItem('timeTracking_selectedProjectId') || '');
     setSelectedTaskId(localStorage.getItem('timeTracking_selectedTaskId') || '');
@@ -644,11 +663,11 @@ const TimeTracking = () => {
               
               <FormControl>
                 <FormLabel>Date</FormLabel>
-                <Input 
-                  type="date" 
+                <Input
+                  type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  max={new Date().toISOString().split('T')[0]}
+                  max={getTodayDateString()}
                   disabled={activeEntry !== null}
                 />
               </FormControl>

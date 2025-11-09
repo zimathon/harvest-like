@@ -74,15 +74,19 @@ const Reports = () => {
   const [reportGenerated, setReportGenerated] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
 
-  // Calculate date range
+  // Calculate date range (タイムゾーンの影響を受けないように文字列で直接構築)
   const getDateRange = useCallback(() => {
-    // Always use selected year and month
-    const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
-    const endOfMonth = new Date(selectedYear, selectedMonth, 0);
-    return {
-      startDate: startOfMonth.toISOString().split('T')[0],
-      endDate: endOfMonth.toISOString().split('T')[0]
-    };
+    const year = selectedYear;
+    const month = selectedMonth;
+
+    // 月の最初の日
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+
+    // 月の最後の日を計算
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    return { startDate, endDate };
   }, [selectedYear, selectedMonth]);
 
   // Generate report
