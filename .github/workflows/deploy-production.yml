@@ -129,6 +129,7 @@ jobs:
           echo "Backend URL: $BACKEND_URL"
 
       - name: Setup Cloud Scheduler Warmup
+        continue-on-error: true
         run: |
           # Create or update Cloud Scheduler job to keep service warm
           echo "Setting up Cloud Scheduler warmup job..."
