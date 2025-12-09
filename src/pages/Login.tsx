@@ -40,7 +40,7 @@ const Login = () => {
         duration: 2000,
         isClosable: true,
       });
-      navigate('/');
+      navigate('/time');
     } catch (error) {
       toast({
         title: 'Login failed',
