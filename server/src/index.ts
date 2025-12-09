@@ -35,23 +35,31 @@ const app = express();
 const allowedOriginsEnv = process.env.CORS_ALLOWED_ORIGINS;
 const allowedOrigins = allowedOriginsEnv ? allowedOriginsEnv.split(',').map(origin => origin.trim()) : [];
 
-// Firebase Hosting preview URL pattern (e.g., https://PROJECT_ID--pr3-branch-name-hash.web.app)
+// Firebase Hosting preview URL pattern (e.g., https://PROJECT_ID--channel-name.web.app)
 // プロジェクトIDを環境変数から取得して動的にパターンを構築
+// Note: Firebase preview channels can have various formats, not just 'pr' prefix
 const projectId = process.env.PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
 const firebasePreviewPattern = projectId
-  ? new RegExp(`^https://${projectId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}--pr[\\w-]+\\.web\\.app$`)
+  ? new RegExp(`^https://${projectId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}--[\\w-]+\\.web\\.app$`)
   : null;
+
+if (projectId) {
+  console.log(`🔐 Firebase preview URL pattern enabled for project: ${projectId}`);
+}
 
 // CORS オプションを設定
 const options: cors.CorsOptions = {
   origin: (origin, callback) => {
     // allowedOrigins に含まれているか、Firebase preview URL パターンにマッチするか、オリジンがない場合 (例: Postmanなどのツール) は許可
-    if (!origin ||
-        allowedOrigins.indexOf(origin) !== -1 ||
-        (origin && firebasePreviewPattern && firebasePreviewPattern.test(origin))) {
+    if (!origin) {
+      callback(null, true);
+    } else if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else if (firebasePreviewPattern && firebasePreviewPattern.test(origin)) {
+      console.log(`CORS: Firebase preview URL allowed: ${origin}`);
       callback(null, true);
     } else {
-      console.warn(`CORS: Origin '${origin}' not allowed.`); // ログに記録
+      console.warn(`CORS: Origin '${origin}' not allowed. Allowed: [${allowedOrigins.join(', ')}], Preview pattern: ${firebasePreviewPattern}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
