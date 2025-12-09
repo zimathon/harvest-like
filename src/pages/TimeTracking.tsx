@@ -32,11 +32,14 @@ import {
   ButtonGroup
 } from '@chakra-ui/react';
 import { MdEdit, MdDelete, MdPlayArrow, MdStop } from 'react-icons/md';
-import { useTimeEntries } from '../contexts/TimeEntryContext';
+import { useTimeEntries, TimePeriod } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useAuth } from '../contexts/AuthContext'; // useAuthをインポート
 import { TimeEntry, Task } from '../types'; // ProjectとTaskをインポート
 import { formatTime } from '../utils/timeFormat';
+
+// タブインデックスとTimePeriodのマッピング
+const TAB_TO_PERIOD: TimePeriod[] = ['day', 'week', 'month', 'all'];
 
 // タイムゾーンの影響を受けずにJSTで今日の日付を取得
 const getTodayDateString = () => {
@@ -67,17 +70,19 @@ const TimeTracking = () => {
   
   const toast = useToast();
   
-  const { 
-    timeEntries, 
-    isLoading, 
-    fetchTimeEntries, 
-    addTimeEntry, 
-    updateTimeEntry, 
+  const {
+    timeEntries,
+    isLoading,
+    fetchTimeEntries,
+    fetchTimeEntriesByPeriod,
+    addTimeEntry,
+    updateTimeEntry,
     deleteTimeEntry,
     startTimer,
     stopTimer,
     resumeTimer,
-    activeEntry 
+    activeEntry,
+    currentPeriod
   } = useTimeEntries();
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -105,9 +110,13 @@ const TimeTracking = () => {
     }
   }, [selectedProjectId, projects, selectedTimeEntry, selectedTaskId]);
 
+  // タブインデックスとcurrentPeriodを同期
   useEffect(() => {
-    fetchTimeEntries();
-  }, [fetchTimeEntries]);
+    const periodIndex = TAB_TO_PERIOD.indexOf(currentPeriod);
+    if (periodIndex !== -1 && periodIndex !== tabIndex) {
+      setTabIndex(periodIndex);
+    }
+  }, [currentPeriod, tabIndex]);
 
   // Save selected project and task to localStorage
   useEffect(() => {
@@ -742,6 +751,11 @@ const TimeTracking = () => {
       <Tabs variant="enclosed" mb={8} index={tabIndex} onChange={(index) => {
         setTabIndex(index);
         setCurrentPage(1); // Reset page when switching tabs
+        // タブ切り替え時に該当期間のデータを取得
+        const period = TAB_TO_PERIOD[index];
+        if (period) {
+          fetchTimeEntriesByPeriod(period);
+        }
       }}>
         <TabList>
           <Tab>Day</Tab>
