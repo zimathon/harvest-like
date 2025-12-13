@@ -132,15 +132,18 @@ const Reports = () => {
     const summary = reportData.reduce((acc, entry) => {
       const projectId = entry.project?.id || entry.projectId || '';
       if (!acc[projectId]) {
+        // Get client name from projects list
+        const projectData = projects.find(p => p.id === projectId);
         acc[projectId] = {
           project: entry.project || { id: projectId, name: entry.projectName || 'Unknown' },
+          clientName: projectData?.clientName || 'Unknown Client',
           totalHours: 0,
           billableHours: 0,
           entries: 0,
           users: new Set()
         };
       }
-      
+
       // hoursフィールドがある場合はそれを使用、なければdurationを秒から時間に変換
       const hours = entry.hours || ((entry.duration || 0) / 3600);
       acc[projectId].totalHours += hours;
@@ -149,25 +152,38 @@ const Reports = () => {
       }
       acc[projectId].entries += 1;
       acc[projectId].users.add(entry.userId);
-      
+
       return acc;
     }, {} as Record<string, any>);
-    
+
     return Object.values(summary).map(item => ({
       ...item,
       userCount: item.users.size
     }));
-  }, [reportData]);
+  }, [reportData, projects]);
+
+  // Create a map of project ID to client name
+  const projectClientMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    projects.forEach(project => {
+      if (project.id) {
+        map[project.id] = project.clientName || 'Unknown Client';
+      }
+    });
+    return map;
+  }, [projects]);
 
   // Daily entries sorted by date
   const dailyEntries = useMemo(() => {
     return reportData
       .map(entry => {
         const hours = entry.hours || ((entry.duration || 0) / 3600);
+        const projectId = entry.project?.id || entry.projectId || '';
         return {
           ...entry,
           calculatedHours: hours,
-          projectName: entry.project?.name || entry.projectName || 'Unknown'
+          projectName: entry.project?.name || entry.projectName || 'Unknown',
+          clientName: projectClientMap[projectId] || 'Unknown Client'
         };
       })
       .sort((a, b) => {
@@ -176,7 +192,7 @@ const Reports = () => {
         if (dateCompare !== 0) return dateCompare;
         return a.projectName.localeCompare(b.projectName);
       });
-  }, [reportData]);
+  }, [reportData, projectClientMap]);
 
   // Calculate total statistics
   const totalStats = useMemo(() => {
@@ -207,27 +223,29 @@ const Reports = () => {
     // Export based on active tab
     if (activeTab === 1) {
       // Daily Breakdown
-      csvContent = 'Date,Day,Project,Task,Notes,Hours,Type\n';
+      csvContent = 'Date,Day,Client,Project,Task,Notes,Hours,Type\n';
       dailyEntries.forEach(entry => {
         const dateInfo = formatDateWithDay(entry.date);
         const notes = entry.notes || entry.description || '-';
-        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.projectName}","${entry.task || '-'}","${notes}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
+        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.clientName}","${entry.projectName}","${entry.task || '-'}","${notes}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
       });
       filename = 'daily-breakdown-report.csv';
     } else if (activeTab === 2) {
       // Project Summary
-      csvContent = 'Project,Total Hours,Billable Hours,Non-Billable Hours,Billable %,Team Members\n';
+      csvContent = 'Client,Project,Total Hours,Billable Hours,Non-Billable Hours,Billable %,Team Members\n';
       projectSummary.forEach(project => {
         const billablePercentage = project.totalHours > 0 ? (project.billableHours / project.totalHours) * 100 : 0;
-        csvContent += `"${project.project.name}",${project.totalHours.toFixed(2)},${project.billableHours.toFixed(2)},${(project.totalHours - project.billableHours).toFixed(2)},${billablePercentage.toFixed(0)}%,${project.userCount}\n`;
+        csvContent += `"${project.clientName}","${project.project.name}",${project.totalHours.toFixed(2)},${project.billableHours.toFixed(2)},${(project.totalHours - project.billableHours).toFixed(2)},${billablePercentage.toFixed(0)}%,${project.userCount}\n`;
       });
       filename = 'project-summary-report.csv';
     } else {
       // Time Summary - Export raw data
-      csvContent = 'Date,Project,Task,Notes,Hours,Billable\n';
+      csvContent = 'Date,Client,Project,Task,Notes,Hours,Billable\n';
       reportData.forEach(entry => {
         const hours = entry.hours || ((entry.duration || 0) / 3600);
-        csvContent += `"${entry.date}","${entry.project?.name || entry.projectName || 'Unknown'}","${entry.task || '-'}","${entry.notes || entry.description || '-'}",${hours.toFixed(2)},${entry.isBillable ? 'Yes' : 'No'}\n`;
+        const projectId = entry.project?.id || entry.projectId || '';
+        const clientName = projectClientMap[projectId] || 'Unknown Client';
+        csvContent += `"${entry.date}","${clientName}","${entry.project?.name || entry.projectName || 'Unknown'}","${entry.task || '-'}","${entry.notes || entry.description || '-'}",${hours.toFixed(2)},${entry.isBillable ? 'Yes' : 'No'}\n`;
       });
       filename = 'time-entries-report.csv';
     }
