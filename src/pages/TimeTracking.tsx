@@ -67,6 +67,10 @@ const TimeTracking = () => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date()); // リアルタイム時間表示用
   const [currentPage, setCurrentPage] = useState<number>(1);
   const entriesPerPage = 20;
+  // フィルタ用のプロジェクトID（エントリ作成用とは別）
+  const [filterProjectId, setFilterProjectId] = useState<string>(() => {
+    return localStorage.getItem('timeTracking_filterProjectId') || '';
+  });
   
   const toast = useToast();
   
@@ -130,6 +134,11 @@ const TimeTracking = () => {
       localStorage.setItem('timeTracking_selectedTaskId', selectedTaskId);
     }
   }, [selectedTaskId]);
+
+  // フィルタプロジェクトをlocalStorageに保存
+  useEffect(() => {
+    localStorage.setItem('timeTracking_filterProjectId', filterProjectId);
+  }, [filterProjectId]);
 
   // タイマーが動いている間のリアルタイム更新
   useEffect(() => {
@@ -232,6 +241,15 @@ const TimeTracking = () => {
     return baseDuration + diffSeconds;
   };
 
+  // プロジェクトでフィルタリング
+  const filterByProject = (entries: TimeEntry[]) => {
+    if (!filterProjectId) return entries;
+    return entries.filter(entry => {
+      const entryProjectId = entry.projectId || entry.project?._id || entry.project?.id;
+      return entryProjectId === filterProjectId;
+    });
+  };
+
   // Filter time entries for today
   const getTodayEntries = () => {
     const today = getTodayDateString();
@@ -251,9 +269,12 @@ const TimeTracking = () => {
       
       return entryDate === today;
     });
-    
+
+    // プロジェクトフィルタを適用
+    const filteredEntries = filterByProject(todayEntries);
+
     // Sort by creation time (newest first)
-    return todayEntries.sort((a, b) => {
+    return filteredEntries.sort((a, b) => {
       const getTime = (entry: TimeEntry) => {
         if (entry.startTime) {
           return new Date(entry.startTime).getTime();
@@ -279,9 +300,9 @@ const TimeTracking = () => {
     lastDayOfWeek.setDate(today.getDate() - dayOfWeek + 6);
     lastDayOfWeek.setHours(23, 59, 59, 999);
 
-    return timeEntries.filter(entry => {
+    const weekEntries = timeEntries.filter(entry => {
       let entryDate: Date;
-      
+
       if (typeof entry.date === 'string') {
         entryDate = new Date(entry.date);
       } else if (entry.date && false) {
@@ -289,15 +310,18 @@ const TimeTracking = () => {
       } else {
         return false;
       }
-      
+
       // Check if date is valid
       if (isNaN(entryDate.getTime())) {
         return false;
       }
-      
+
       entryDate.setHours(0, 0, 0, 0);
       return entryDate >= firstDayOfWeek && entryDate <= lastDayOfWeek;
     });
+
+    // プロジェクトフィルタを適用
+    return filterByProject(weekEntries);
   };
 
   // Filter time entries for the current month
@@ -308,7 +332,7 @@ const TimeTracking = () => {
     const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     lastDayOfMonth.setHours(23, 59, 59, 999);
 
-    return timeEntries.filter(entry => {
+    const monthEntries = timeEntries.filter(entry => {
       let entryDate: Date;
 
       if (typeof entry.date === 'string') {
@@ -327,6 +351,9 @@ const TimeTracking = () => {
       entryDate.setHours(0, 0, 0, 0);
       return entryDate >= firstDayOfMonth && entryDate <= lastDayOfMonth;
     });
+
+    // プロジェクトフィルタを適用
+    return filterByProject(monthEntries);
   };
 
   // Calculate total duration for entries
@@ -747,7 +774,38 @@ const TimeTracking = () => {
           </VStack>
         </CardBody>
       </Card>
-      
+
+      {/* プロジェクトフィルタ */}
+      <Flex mb={4} align="center" justify="space-between">
+        <HStack spacing={4}>
+          <Text fontWeight="medium">Filter by Project:</Text>
+          <Select
+            placeholder="All Projects"
+            value={filterProjectId}
+            onChange={(e) => {
+              setFilterProjectId(e.target.value);
+              setCurrentPage(1); // フィルタ変更時にページをリセット
+            }}
+            w="250px"
+          >
+            {projects.map(project => (
+              <option key={project._id || project.id} value={project._id || project.id}>
+                {project.name}
+              </option>
+            ))}
+          </Select>
+          {filterProjectId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setFilterProjectId('')}
+            >
+              Clear Filter
+            </Button>
+          )}
+        </HStack>
+      </Flex>
+
       <Tabs variant="enclosed" mb={8} index={tabIndex} onChange={(index) => {
         setTabIndex(index);
         setCurrentPage(1); // Reset page when switching tabs
@@ -824,7 +882,7 @@ const TimeTracking = () => {
                 </Box>
               </>
             ) : (
-              <Text p={4}>No entries recorded today.</Text>
+              <Text p={4}>{filterProjectId ? 'No entries found for the selected project today.' : 'No entries recorded today.'}</Text>
             )}
           </TabPanel>
           
@@ -887,7 +945,7 @@ const TimeTracking = () => {
                 </Box>
               </>
             ) : (
-              <Text p={4}>No entries recorded this week.</Text>
+              <Text p={4}>{filterProjectId ? 'No entries found for the selected project this week.' : 'No entries recorded this week.'}</Text>
             )}
           </TabPanel>
           
@@ -950,104 +1008,111 @@ const TimeTracking = () => {
                 </Box>
               </>
             ) : (
-              <Text p={4}>No entries recorded this month.</Text>
+              <Text p={4}>{filterProjectId ? 'No entries found for the selected project this month.' : 'No entries recorded this month.'}</Text>
             )}
           </TabPanel>
           
           <TabPanel>
-            {isLoading ? (
-              <Flex justify="center" p={10}>
-                <Spinner />
-              </Flex>
-            ) : timeEntries.length > 0 ? (
-              <>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Date</Th>
-                      <Th>Project</Th>
-                      <Th>Task</Th>
-                      <Th>Notes</Th>
-                      <Th>Duration</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {timeEntries
-                      .sort((a, b) => {
-                        const dateA = new Date(a.date);
-                        const dateB = new Date(b.date);
-                        return dateB.getTime() - dateA.getTime();
-                      })
-                      .slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage)
-                      .map(entry => (
-                      <Tr key={entry._id || entry.id}>
-                        <Td>{entry.date}</Td>
-                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
-                        <Td>{entry.notes || '-'}</Td>
-                        <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <IconButton
-                              aria-label="Edit"
-                              icon={<MdEdit />}
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditEntry(entry)}
-                            />
-                            <IconButton
-                              aria-label="Delete"
-                              icon={<MdDelete />}
-                              size="sm"
-                              variant="ghost"
-                              colorScheme="red"
-                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                            />
-                          </HStack>
-                        </Td>
+            {(() => {
+              const filteredAllEntries = filterByProject(timeEntries);
+              const sortedEntries = filteredAllEntries.sort((a, b) => {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB.getTime() - dateA.getTime();
+              });
+              const totalPages = Math.ceil(sortedEntries.length / entriesPerPage);
+              const paginatedEntries = sortedEntries.slice(
+                (currentPage - 1) * entriesPerPage,
+                currentPage * entriesPerPage
+              );
+
+              return isLoading ? (
+                <Flex justify="center" p={10}>
+                  <Spinner />
+                </Flex>
+              ) : sortedEntries.length > 0 ? (
+                <>
+                  <Table variant="simple">
+                    <Thead>
+                      <Tr>
+                        <Th>Date</Th>
+                        <Th>Project</Th>
+                        <Th>Task</Th>
+                        <Th>Notes</Th>
+                        <Th>Duration</Th>
+                        <Th>Actions</Th>
                       </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-                
-                {timeEntries.length > entriesPerPage && (
-                  <Flex justify="center" mt={4}>
-                    <ButtonGroup size="sm" spacing={2}>
-                      <Button
-                        onClick={() => setCurrentPage(1)}
-                        isDisabled={currentPage === 1}
-                      >
-                        First
-                      </Button>
-                      <Button
-                        onClick={() => setCurrentPage(currentPage - 1)}
-                        isDisabled={currentPage === 1}
-                      >
-                        Previous
-                      </Button>
-                      <Text alignSelf="center" px={4}>
-                        Page {currentPage} of {Math.ceil(timeEntries.length / entriesPerPage)}
-                      </Text>
-                      <Button
-                        onClick={() => setCurrentPage(currentPage + 1)}
-                        isDisabled={currentPage === Math.ceil(timeEntries.length / entriesPerPage)}
-                      >
-                        Next
-                      </Button>
-                      <Button
-                        onClick={() => setCurrentPage(Math.ceil(timeEntries.length / entriesPerPage))}
-                        isDisabled={currentPage === Math.ceil(timeEntries.length / entriesPerPage)}
-                      >
-                        Last
-                      </Button>
-                    </ButtonGroup>
-                  </Flex>
-                )}
-              </>
-            ) : (
-              <Text p={4}>No time entries recorded.</Text>
-            )}
+                    </Thead>
+                    <Tbody>
+                      {paginatedEntries.map(entry => (
+                        <Tr key={entry._id || entry.id}>
+                          <Td>{entry.date}</Td>
+                          <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
+                          <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                          <Td>{entry.notes || '-'}</Td>
+                          <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
+                          <Td>
+                            <HStack spacing={2}>
+                              <IconButton
+                                aria-label="Edit"
+                                icon={<MdEdit />}
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditEntry(entry)}
+                              />
+                              <IconButton
+                                aria-label="Delete"
+                                icon={<MdDelete />}
+                                size="sm"
+                                variant="ghost"
+                                colorScheme="red"
+                                onClick={() => handleDeleteEntry(entry._id || entry.id)}
+                              />
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+
+                  {sortedEntries.length > entriesPerPage && (
+                    <Flex justify="center" mt={4}>
+                      <ButtonGroup size="sm" spacing={2}>
+                        <Button
+                          onClick={() => setCurrentPage(1)}
+                          isDisabled={currentPage === 1}
+                        >
+                          First
+                        </Button>
+                        <Button
+                          onClick={() => setCurrentPage(currentPage - 1)}
+                          isDisabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <Text alignSelf="center" px={4}>
+                          Page {currentPage} of {totalPages}
+                        </Text>
+                        <Button
+                          onClick={() => setCurrentPage(currentPage + 1)}
+                          isDisabled={currentPage === totalPages}
+                        >
+                          Next
+                        </Button>
+                        <Button
+                          onClick={() => setCurrentPage(totalPages)}
+                          isDisabled={currentPage === totalPages}
+                        >
+                          Last
+                        </Button>
+                      </ButtonGroup>
+                    </Flex>
+                  )}
+                </>
+              ) : (
+                <Text p={4}>{filterProjectId ? 'No entries found for the selected project.' : 'No time entries recorded.'}</Text>
+              );
+            })()}
           </TabPanel>
         </TabPanels>
       </Tabs>
