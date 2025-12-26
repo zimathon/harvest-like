@@ -34,6 +34,7 @@ import {
 import { MdEdit, MdDelete, MdPlayArrow, MdStop } from 'react-icons/md';
 import { useTimeEntries, TimePeriod } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
+import { useClients } from '../contexts/ClientContext';
 import { useAuth } from '../contexts/AuthContext'; // useAuthをインポート
 import { TimeEntry, Task } from '../types'; // ProjectとTaskをインポート
 import { formatTime } from '../utils/timeFormat';
@@ -52,6 +53,7 @@ const getTodayDateString = () => {
 
 const TimeTracking = () => {
   const { projects } = useProjects();
+  const { clients } = useClients();
   const { user } = useAuth();
   const [date, setDate] = useState<string>(getTodayDateString());
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
@@ -70,6 +72,10 @@ const TimeTracking = () => {
   // フィルタ用のプロジェクトID（エントリ作成用とは別）
   const [filterProjectId, setFilterProjectId] = useState<string>(() => {
     return localStorage.getItem('timeTracking_filterProjectId') || '';
+  });
+  // フィルタ用のクライアントID
+  const [filterClientId, setFilterClientId] = useState<string>(() => {
+    return localStorage.getItem('timeTracking_filterClientId') || '';
   });
   
   const toast = useToast();
@@ -139,6 +145,11 @@ const TimeTracking = () => {
   useEffect(() => {
     localStorage.setItem('timeTracking_filterProjectId', filterProjectId);
   }, [filterProjectId]);
+
+  // フィルタクライアントをlocalStorageに保存
+  useEffect(() => {
+    localStorage.setItem('timeTracking_filterClientId', filterClientId);
+  }, [filterClientId]);
 
   // タイマーが動いている間のリアルタイム更新
   useEffect(() => {
@@ -250,6 +261,26 @@ const TimeTracking = () => {
     });
   };
 
+  // クライアントでフィルタリング
+  const filterByClient = (entries: TimeEntry[]) => {
+    if (!filterClientId) return entries;
+    return entries.filter(entry => {
+      // エントリーのプロジェクトIDを取得
+      const entryProjectId = entry.projectId || entry.project?._id || entry.project?.id;
+      if (!entryProjectId) return false;
+      // プロジェクトを見つけてクライアントIDを確認
+      const project = projects.find(p => (p._id || p.id) === entryProjectId);
+      if (!project) return false;
+      const projectClientId = project.clientId || (typeof project.client === 'string' ? project.client : project.client?._id || project.client?.id);
+      return projectClientId === filterClientId;
+    });
+  };
+
+  // 両方のフィルタを適用
+  const applyFilters = (entries: TimeEntry[]) => {
+    return filterByClient(filterByProject(entries));
+  };
+
   // Filter time entries for today
   const getTodayEntries = () => {
     const today = getTodayDateString();
@@ -271,7 +302,7 @@ const TimeTracking = () => {
     });
 
     // プロジェクトフィルタを適用
-    const filteredEntries = filterByProject(todayEntries);
+    const filteredEntries = applyFilters(todayEntries);
 
     // Sort by creation time (newest first)
     return filteredEntries.sort((a, b) => {
@@ -320,8 +351,8 @@ const TimeTracking = () => {
       return entryDate >= firstDayOfWeek && entryDate <= lastDayOfWeek;
     });
 
-    // プロジェクトフィルタを適用
-    return filterByProject(weekEntries);
+    // フィルタを適用
+    return applyFilters(weekEntries);
   };
 
   // Filter time entries for the current month
@@ -352,8 +383,8 @@ const TimeTracking = () => {
       return entryDate >= firstDayOfMonth && entryDate <= lastDayOfMonth;
     });
 
-    // プロジェクトフィルタを適用
-    return filterByProject(monthEntries);
+    // フィルタを適用
+    return applyFilters(monthEntries);
   };
 
   // Calculate total duration for entries
@@ -775,32 +806,55 @@ const TimeTracking = () => {
         </CardBody>
       </Card>
 
-      {/* プロジェクトフィルタ */}
-      <Flex mb={4} align="center" justify="space-between">
-        <HStack spacing={4}>
-          <Text fontWeight="medium">Filter by Project:</Text>
-          <Select
-            placeholder="All Projects"
-            value={filterProjectId}
-            onChange={(e) => {
-              setFilterProjectId(e.target.value);
-              setCurrentPage(1); // フィルタ変更時にページをリセット
-            }}
-            w="250px"
-          >
-            {projects.map(project => (
-              <option key={project._id || project.id} value={project._id || project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
-          {filterProjectId && (
+      {/* フィルタ */}
+      <Flex mb={4} align="center" justify="space-between" wrap="wrap" gap={4}>
+        <HStack spacing={4} wrap="wrap">
+          <HStack spacing={2}>
+            <Text fontWeight="medium">Client:</Text>
+            <Select
+              placeholder="All Clients"
+              value={filterClientId}
+              onChange={(e) => {
+                setFilterClientId(e.target.value);
+                setCurrentPage(1); // フィルタ変更時にページをリセット
+              }}
+              w="200px"
+            >
+              {clients.map(client => (
+                <option key={client._id || client.id} value={client._id || client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </Select>
+          </HStack>
+          <HStack spacing={2}>
+            <Text fontWeight="medium">Project:</Text>
+            <Select
+              placeholder="All Projects"
+              value={filterProjectId}
+              onChange={(e) => {
+                setFilterProjectId(e.target.value);
+                setCurrentPage(1); // フィルタ変更時にページをリセット
+              }}
+              w="200px"
+            >
+              {projects.map(project => (
+                <option key={project._id || project.id} value={project._id || project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </HStack>
+          {(filterProjectId || filterClientId) && (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => setFilterProjectId('')}
+              onClick={() => {
+                setFilterProjectId('');
+                setFilterClientId('');
+              }}
             >
-              Clear Filter
+              Clear Filters
             </Button>
           )}
         </HStack>
@@ -882,7 +936,7 @@ const TimeTracking = () => {
                 </Box>
               </>
             ) : (
-              <Text p={4}>{filterProjectId ? 'No entries found for the selected project today.' : 'No entries recorded today.'}</Text>
+              <Text p={4}>{(filterProjectId || filterClientId) ? 'No entries found for the selected filter today.' : 'No entries recorded today.'}</Text>
             )}
           </TabPanel>
           
@@ -945,7 +999,7 @@ const TimeTracking = () => {
                 </Box>
               </>
             ) : (
-              <Text p={4}>{filterProjectId ? 'No entries found for the selected project this week.' : 'No entries recorded this week.'}</Text>
+              <Text p={4}>{(filterProjectId || filterClientId) ? 'No entries found for the selected filter this week.' : 'No entries recorded this week.'}</Text>
             )}
           </TabPanel>
           
@@ -1008,13 +1062,13 @@ const TimeTracking = () => {
                 </Box>
               </>
             ) : (
-              <Text p={4}>{filterProjectId ? 'No entries found for the selected project this month.' : 'No entries recorded this month.'}</Text>
+              <Text p={4}>{(filterProjectId || filterClientId) ? 'No entries found for the selected filter this month.' : 'No entries recorded this month.'}</Text>
             )}
           </TabPanel>
           
           <TabPanel>
             {(() => {
-              const filteredAllEntries = filterByProject(timeEntries);
+              const filteredAllEntries = applyFilters(timeEntries);
               const sortedEntries = filteredAllEntries.sort((a, b) => {
                 const dateA = new Date(a.date);
                 const dateB = new Date(b.date);
@@ -1110,7 +1164,7 @@ const TimeTracking = () => {
                   )}
                 </>
               ) : (
-                <Text p={4}>{filterProjectId ? 'No entries found for the selected project.' : 'No time entries recorded.'}</Text>
+                <Text p={4}>{(filterProjectId || filterClientId) ? 'No entries found for the selected filter.' : 'No time entries recorded.'}</Text>
               );
             })()}
           </TabPanel>
