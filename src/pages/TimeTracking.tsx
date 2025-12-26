@@ -34,6 +34,7 @@ import {
 import { MdEdit, MdDelete, MdPlayArrow, MdStop } from 'react-icons/md';
 import { useTimeEntries, TimePeriod } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
+import { useClients } from '../contexts/ClientContext';
 import { useAuth } from '../contexts/AuthContext'; // useAuthをインポート
 import { TimeEntry, Task } from '../types'; // ProjectとTaskをインポート
 import { formatTime } from '../utils/timeFormat';
@@ -52,6 +53,7 @@ const getTodayDateString = () => {
 
 const TimeTracking = () => {
   const { projects } = useProjects();
+  const { clients } = useClients();
   const { user } = useAuth();
   const [date, setDate] = useState<string>(getTodayDateString());
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() => {
@@ -67,6 +69,9 @@ const TimeTracking = () => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date()); // リアルタイム時間表示用
   const [currentPage, setCurrentPage] = useState<number>(1);
   const entriesPerPage = 20;
+  const [filterClientId, setFilterClientId] = useState<string>(() => {
+    return localStorage.getItem('timeTracking_filterClientId') || '';
+  });
   
   const toast = useToast();
   
@@ -130,6 +135,11 @@ const TimeTracking = () => {
       localStorage.setItem('timeTracking_selectedTaskId', selectedTaskId);
     }
   }, [selectedTaskId]);
+
+  // Save filter client to localStorage
+  useEffect(() => {
+    localStorage.setItem('timeTracking_filterClientId', filterClientId);
+  }, [filterClientId]);
 
   // タイマーが動いている間のリアルタイム更新
   useEffect(() => {
@@ -326,6 +336,27 @@ const TimeTracking = () => {
 
       entryDate.setHours(0, 0, 0, 0);
       return entryDate >= firstDayOfMonth && entryDate <= lastDayOfMonth;
+    });
+  };
+
+  // Filter entries by client
+  const filterByClient = (entries: TimeEntry[]) => {
+    if (!filterClientId) return entries;
+
+    return entries.filter(entry => {
+      // Get project from entry
+      const projectId = entry.projectId || entry.project?._id || entry.project?.id;
+      if (!projectId) return false;
+
+      // Find the project to get its clientId
+      const project = projects.find(p => (p._id || p.id) === projectId);
+      if (!project) return false;
+
+      // Check if project's client matches the filter
+      const projectClientId = project.clientId ||
+        (typeof project.client === 'string' ? project.client : project.client?.id || project.client?._id);
+
+      return projectClientId === filterClientId;
     });
   };
 
@@ -748,6 +779,41 @@ const TimeTracking = () => {
         </CardBody>
       </Card>
       
+      {/* Client Filter */}
+      <Box mb={4}>
+        <HStack spacing={4} align="end">
+          <FormControl maxW="300px">
+            <FormLabel>Filter by Client</FormLabel>
+            <Select
+              placeholder="All Clients"
+              value={filterClientId}
+              onChange={(e) => {
+                setFilterClientId(e.target.value);
+                setCurrentPage(1); // Reset page when filter changes
+              }}
+            >
+              {clients.map(client => (
+                <option key={client._id || client.id} value={client._id || client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </Select>
+          </FormControl>
+          {filterClientId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterClientId('');
+                setCurrentPage(1);
+              }}
+            >
+              Clear Filter
+            </Button>
+          )}
+        </HStack>
+      </Box>
+
       <Tabs variant="enclosed" mb={8} index={tabIndex} onChange={(index) => {
         setTabIndex(index);
         setCurrentPage(1); // Reset page when switching tabs
@@ -770,7 +836,7 @@ const TimeTracking = () => {
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
-            ) : getTodayEntries().length > 0 ? (
+            ) : filterByClient(getTodayEntries()).length > 0 ? (
               <>
                 <Table variant="simple">
                   <Thead>
@@ -784,7 +850,7 @@ const TimeTracking = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {getTodayEntries().map(entry => (
+                    {filterByClient(getTodayEntries()).map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
@@ -818,13 +884,13 @@ const TimeTracking = () => {
                   <Flex justify="space-between" align="center">
                     <Text fontWeight="bold" fontSize="lg">Total:</Text>
                     <Text fontWeight="bold" fontSize="lg" color="blue.600">
-                      {calculateTotalDuration(getTodayEntries())}
+                      {calculateTotalDuration(filterByClient(getTodayEntries()))}
                     </Text>
                   </Flex>
                 </Box>
               </>
             ) : (
-              <Text p={4}>No entries recorded today.</Text>
+              <Text p={4}>{filterClientId ? 'No entries for the selected client today.' : 'No entries recorded today.'}</Text>
             )}
           </TabPanel>
           
@@ -833,7 +899,7 @@ const TimeTracking = () => {
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
-            ) : getWeekEntries().length > 0 ? (
+            ) : filterByClient(getWeekEntries()).length > 0 ? (
               <>
                 <Table variant="simple">
                   <Thead>
@@ -847,7 +913,7 @@ const TimeTracking = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {getWeekEntries().map(entry => (
+                    {filterByClient(getWeekEntries()).map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
@@ -881,22 +947,22 @@ const TimeTracking = () => {
                   <Flex justify="space-between" align="center">
                     <Text fontWeight="bold" fontSize="lg">Total:</Text>
                     <Text fontWeight="bold" fontSize="lg" color="blue.600">
-                      {calculateTotalDuration(getWeekEntries())}
+                      {calculateTotalDuration(filterByClient(getWeekEntries()))}
                     </Text>
                   </Flex>
                 </Box>
               </>
             ) : (
-              <Text p={4}>No entries recorded this week.</Text>
+              <Text p={4}>{filterClientId ? 'No entries for the selected client this week.' : 'No entries recorded this week.'}</Text>
             )}
           </TabPanel>
-          
+
           <TabPanel>
             {isLoading ? (
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
-            ) : getMonthEntries().length > 0 ? (
+            ) : filterByClient(getMonthEntries()).length > 0 ? (
               <>
                 <Table variant="simple">
                   <Thead>
@@ -910,7 +976,7 @@ const TimeTracking = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {getMonthEntries().map(entry => (
+                    {filterByClient(getMonthEntries()).map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
                         <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
@@ -944,22 +1010,22 @@ const TimeTracking = () => {
                   <Flex justify="space-between" align="center">
                     <Text fontWeight="bold" fontSize="lg">Total:</Text>
                     <Text fontWeight="bold" fontSize="lg" color="blue.600">
-                      {calculateTotalDuration(getMonthEntries())}
+                      {calculateTotalDuration(filterByClient(getMonthEntries()))}
                     </Text>
                   </Flex>
                 </Box>
               </>
             ) : (
-              <Text p={4}>No entries recorded this month.</Text>
+              <Text p={4}>{filterClientId ? 'No entries for the selected client this month.' : 'No entries recorded this month.'}</Text>
             )}
           </TabPanel>
-          
+
           <TabPanel>
             {isLoading ? (
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
-            ) : timeEntries.length > 0 ? (
+            ) : filterByClient(timeEntries).length > 0 ? (
               <>
                 <Table variant="simple">
                   <Thead>
@@ -973,7 +1039,7 @@ const TimeTracking = () => {
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {timeEntries
+                    {filterByClient(timeEntries)
                       .sort((a, b) => {
                         const dateA = new Date(a.date);
                         const dateB = new Date(b.date);
@@ -1011,7 +1077,7 @@ const TimeTracking = () => {
                   </Tbody>
                 </Table>
                 
-                {timeEntries.length > entriesPerPage && (
+                {filterByClient(timeEntries).length > entriesPerPage && (
                   <Flex justify="center" mt={4}>
                     <ButtonGroup size="sm" spacing={2}>
                       <Button
@@ -1027,17 +1093,17 @@ const TimeTracking = () => {
                         Previous
                       </Button>
                       <Text alignSelf="center" px={4}>
-                        Page {currentPage} of {Math.ceil(timeEntries.length / entriesPerPage)}
+                        Page {currentPage} of {Math.ceil(filterByClient(timeEntries).length / entriesPerPage)}
                       </Text>
                       <Button
                         onClick={() => setCurrentPage(currentPage + 1)}
-                        isDisabled={currentPage === Math.ceil(timeEntries.length / entriesPerPage)}
+                        isDisabled={currentPage === Math.ceil(filterByClient(timeEntries).length / entriesPerPage)}
                       >
                         Next
                       </Button>
                       <Button
-                        onClick={() => setCurrentPage(Math.ceil(timeEntries.length / entriesPerPage))}
-                        isDisabled={currentPage === Math.ceil(timeEntries.length / entriesPerPage)}
+                        onClick={() => setCurrentPage(Math.ceil(filterByClient(timeEntries).length / entriesPerPage))}
+                        isDisabled={currentPage === Math.ceil(filterByClient(timeEntries).length / entriesPerPage)}
                       >
                         Last
                       </Button>
@@ -1046,7 +1112,7 @@ const TimeTracking = () => {
                 )}
               </>
             ) : (
-              <Text p={4}>No time entries recorded.</Text>
+              <Text p={4}>{filterClientId ? 'No entries for the selected client.' : 'No time entries recorded.'}</Text>
             )}
           </TabPanel>
         </TabPanels>
