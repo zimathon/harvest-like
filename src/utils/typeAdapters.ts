@@ -60,12 +60,15 @@ export function apiUserToOldUser(apiUser: ApiUser): OldUser {
  * Convert API Project to old Project type
  */
 export function apiProjectToOldProject(apiProject: ApiProject): OldProject {
+  // Cast to any to access clientId which exists in API response but not in generated types
+  const rawProject = apiProject as any;
   return {
     id: apiProject.id || apiProject._id || '',
     _id: apiProject.id || apiProject._id || '',
     name: apiProject.name || '',
     description: apiProject.description || '',
     client: apiProject.client || '',
+    clientId: rawProject.clientId || apiProject.client || '', // Copy clientId from API response
     clientName: apiProject.clientName || apiProject.client || '', // Use clientName from API if available
     status: (apiProject.status || 'active') as 'active' | 'completed' | 'archived' | 'on hold',
     startDate: apiProject.startDate || '',
