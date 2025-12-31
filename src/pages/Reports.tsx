@@ -187,8 +187,8 @@ const Reports = () => {
         };
       })
       .sort((a, b) => {
-        // Sort by date (descending), then by project name
-        const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+        // Sort by date (ascending), then by project name
+        const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
         if (dateCompare !== 0) return dateCompare;
         return a.projectName.localeCompare(b.projectName);
       });
@@ -239,9 +239,12 @@ const Reports = () => {
       });
       filename = 'project-summary-report.csv';
     } else {
-      // Time Summary - Export raw data
+      // Time Summary - Export raw data (sorted by date ascending)
       csvContent = 'Date,Client,Project,Task,Notes,Hours,Billable\n';
-      reportData.forEach(entry => {
+      const sortedData = [...reportData].sort((a, b) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      sortedData.forEach(entry => {
         const hours = entry.hours || ((entry.duration || 0) / 3600);
         const projectId = entry.project?.id || entry.projectId || '';
         const clientName = projectClientMap[projectId] || 'Unknown Client';
