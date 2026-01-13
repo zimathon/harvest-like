@@ -432,9 +432,9 @@ const TimeTracking = () => {
       const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
       totalSeconds = (hours * 3600) + (minutes * 60);
     } else {
-      // 数値のみの場合は分として扱う
-      const minutes = parseFloat(duration) || 0;
-      totalSeconds = minutes * 60;
+      // 数値のみの場合は時間として扱う
+      const hours = parseFloat(duration) || 0;
+      totalSeconds = hours * 3600;
     }
     
     // durationが0または無効な場合のチェック
@@ -716,15 +716,15 @@ const TimeTracking = () => {
             <HStack spacing={4}>
               <FormControl>
                 <FormLabel>Time</FormLabel>
-                <Input 
-                  type="text" 
-                  placeholder="1:30 (1h 30m) or 90 (90 minutes)" 
+                <Input
+                  type="text"
+                  placeholder="1:30 or 1h 30m or 1.5 (hours)"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   disabled={activeEntry !== null}
                 />
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  Format: "1:30" (hours:minutes) or "1h 30m" or "90" (minutes)
+                  Format: "1:30" (hours:minutes) or "1h 30m" or "1.5" (hours)
                 </Text>
               </FormControl>
               
