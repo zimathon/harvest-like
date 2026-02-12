@@ -29,9 +29,15 @@ import {
   Spinner,
   Badge,
   Flex,
-  ButtonGroup
+  ButtonGroup,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverBody,
+  Grid,
+  GridItem
 } from '@chakra-ui/react';
-import { MdEdit, MdDelete, MdPlayArrow, MdStop } from 'react-icons/md';
+import { MdEdit, MdDelete, MdPlayArrow, MdStop, MdChevronLeft, MdChevronRight, MdCalendarToday } from 'react-icons/md';
 import { useTimeEntries, TimePeriod } from '../contexts/TimeEntryContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useClients } from '../contexts/ClientContext';
@@ -49,6 +55,212 @@ const getTodayDateString = () => {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+// 日付を表示用にフォーマット（例: "2月12日 (水)"）
+const formatDateForDisplay = (dateString: string) => {
+  const date = new Date(dateString + 'T00:00:00');
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const weekday = weekdays[date.getDay()];
+  return `${month}月${day}日 (${weekday})`;
+};
+
+// 日付を1日進める/戻す
+const adjustDate = (dateString: string, days: number): string => {
+  const date = new Date(dateString + 'T00:00:00');
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// カレンダーコンポーネント
+interface CalendarProps {
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  onClose: () => void;
+  maxDate?: string;
+}
+
+const Calendar = ({ selectedDate, onSelectDate, onClose, maxDate }: CalendarProps) => {
+  const [viewDate, setViewDate] = useState(() => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const handlePrevMonth = () => {
+    setViewDate(prev => {
+      if (prev.month === 0) {
+        return { year: prev.year - 1, month: 11 };
+      }
+      return { year: prev.year, month: prev.month - 1 };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setViewDate(prev => {
+      if (prev.month === 11) {
+        return { year: prev.year + 1, month: 0 };
+      }
+      return { year: prev.year, month: prev.month + 1 };
+    });
+  };
+
+  const handleSelectDay = (day: number) => {
+    const year = viewDate.year;
+    const month = String(viewDate.month + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const newDate = `${year}-${month}-${dayStr}`;
+
+    // maxDate チェック
+    if (maxDate && newDate > maxDate) {
+      return;
+    }
+
+    onSelectDate(newDate);
+    onClose();
+  };
+
+  const daysInMonth = getDaysInMonth(viewDate.year, viewDate.month);
+  const firstDay = getFirstDayOfMonth(viewDate.year, viewDate.month);
+  const days: (number | null)[] = [];
+
+  // 月初めの空白セルを追加
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+
+  // 日付セルを追加
+  for (let i = 1; i <= daysInMonth; i++) {
+    days.push(i);
+  }
+
+  // 選択中の日付を解析
+  const selectedParts = selectedDate.split('-');
+  const selectedYear = parseInt(selectedParts[0]);
+  const selectedMonth = parseInt(selectedParts[1]) - 1;
+  const selectedDay = parseInt(selectedParts[2]);
+
+  // 今日の日付
+  const todayStr = getTodayDateString();
+  const todayParts = todayStr.split('-');
+  const todayYear = parseInt(todayParts[0]);
+  const todayMonth = parseInt(todayParts[1]) - 1;
+  const todayDay = parseInt(todayParts[2]);
+
+  return (
+    <Box p={2} minW="280px">
+      {/* ヘッダー: 月表示と前後移動 */}
+      <Flex justify="space-between" align="center" mb={3}>
+        <IconButton
+          aria-label="Previous month"
+          icon={<MdChevronLeft />}
+          size="sm"
+          variant="ghost"
+          onClick={handlePrevMonth}
+        />
+        <Text fontWeight="bold" fontSize="md">
+          {viewDate.year}年 {monthNames[viewDate.month]}
+        </Text>
+        <IconButton
+          aria-label="Next month"
+          icon={<MdChevronRight />}
+          size="sm"
+          variant="ghost"
+          onClick={handleNextMonth}
+        />
+      </Flex>
+
+      {/* 曜日ヘッダー */}
+      <Grid templateColumns="repeat(7, 1fr)" gap={1} mb={2}>
+        {weekdays.map((day, index) => (
+          <GridItem key={day} textAlign="center">
+            <Text
+              fontSize="xs"
+              fontWeight="bold"
+              color={index === 0 ? 'red.500' : index === 6 ? 'blue.500' : 'gray.600'}
+            >
+              {day}
+            </Text>
+          </GridItem>
+        ))}
+      </Grid>
+
+      {/* 日付グリッド */}
+      <Grid templateColumns="repeat(7, 1fr)" gap={1}>
+        {days.map((day, index) => {
+          if (day === null) {
+            return <GridItem key={`empty-${index}`} />;
+          }
+
+          const isSelected = viewDate.year === selectedYear && viewDate.month === selectedMonth && day === selectedDay;
+          const isToday = viewDate.year === todayYear && viewDate.month === todayMonth && day === todayDay;
+          const dayOfWeek = (firstDay + day - 1) % 7;
+
+          // maxDate チェック
+          const dateStr = `${viewDate.year}-${String(viewDate.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const isDisabled = maxDate ? dateStr > maxDate : false;
+
+          return (
+            <GridItem key={day}>
+              <Button
+                size="sm"
+                w="100%"
+                h="32px"
+                variant={isSelected ? 'solid' : 'ghost'}
+                colorScheme={isSelected ? 'blue' : undefined}
+                bg={isToday && !isSelected ? 'blue.50' : undefined}
+                color={
+                  isDisabled ? 'gray.300' :
+                  isSelected ? 'white' :
+                  dayOfWeek === 0 ? 'red.500' :
+                  dayOfWeek === 6 ? 'blue.500' :
+                  undefined
+                }
+                border={isToday ? '2px solid' : undefined}
+                borderColor={isToday ? 'blue.300' : undefined}
+                onClick={() => !isDisabled && handleSelectDay(day)}
+                isDisabled={isDisabled}
+                _hover={isDisabled ? {} : { bg: isSelected ? 'blue.600' : 'gray.100' }}
+              >
+                {day}
+              </Button>
+            </GridItem>
+          );
+        })}
+      </Grid>
+
+      {/* 今日ボタン */}
+      <Flex justify="center" mt={3}>
+        <Button
+          size="sm"
+          variant="outline"
+          colorScheme="blue"
+          onClick={() => {
+            const today = getTodayDateString();
+            onSelectDate(today);
+            onClose();
+          }}
+        >
+          今日
+        </Button>
+      </Flex>
+    </Box>
+  );
 };
 
 const TimeTracking = () => {
@@ -730,13 +942,57 @@ const TimeTracking = () => {
               
               <FormControl>
                 <FormLabel>Date</FormLabel>
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  max={getTodayDateString()}
-                  disabled={activeEntry !== null}
-                />
+                <HStack spacing={2}>
+                  <IconButton
+                    aria-label="Previous day"
+                    icon={<MdChevronLeft />}
+                    size="md"
+                    variant="outline"
+                    onClick={() => setDate(adjustDate(date, -1))}
+                    isDisabled={activeEntry !== null}
+                  />
+                  <Popover placement="bottom-start">
+                    {({ onClose }) => (
+                      <>
+                        <PopoverTrigger>
+                          <Button
+                            variant="outline"
+                            leftIcon={<MdCalendarToday />}
+                            minW="160px"
+                            justifyContent="flex-start"
+                            fontWeight="normal"
+                            isDisabled={activeEntry !== null}
+                          >
+                            {formatDateForDisplay(date)}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent w="auto">
+                          <PopoverBody p={0}>
+                            <Calendar
+                              selectedDate={date}
+                              onSelectDate={setDate}
+                              onClose={onClose}
+                              maxDate={getTodayDateString()}
+                            />
+                          </PopoverBody>
+                        </PopoverContent>
+                      </>
+                    )}
+                  </Popover>
+                  <IconButton
+                    aria-label="Next day"
+                    icon={<MdChevronRight />}
+                    size="md"
+                    variant="outline"
+                    onClick={() => {
+                      const newDate = adjustDate(date, 1);
+                      if (newDate <= getTodayDateString()) {
+                        setDate(newDate);
+                      }
+                    }}
+                    isDisabled={activeEntry !== null || date >= getTodayDateString()}
+                  />
+                </HStack>
               </FormControl>
             </HStack>
             
