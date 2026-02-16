@@ -712,12 +712,11 @@ const TimeTracking = () => {
         });
       }
 
-      // フォームをリセット（プロジェクトとタスクは保持）
+      // フォームをリセット（プロジェクトとタスクと日付は保持）
       setSelectedTimeEntry(null);
       setDuration('');
       setNotes('');
-      // プロジェクトとタスクは選択状態を維持
-      setDate(getTodayDateString());
+      // プロジェクト、タスク、日付は選択状態を維持
 
     } catch (error) {
       toast({
@@ -859,7 +858,7 @@ const TimeTracking = () => {
   // 編集をキャンセル
   const handleCancelEdit = () => {
     setSelectedTimeEntry(null);
-    setDate(getTodayDateString());
+    // 日付は現在選択している日付を維持
     // プロジェクトとタスクは保存された値に戻す
     setSelectedProjectId(localStorage.getItem('timeTracking_selectedProjectId') || '');
     setSelectedTaskId(localStorage.getItem('timeTracking_selectedTaskId') || '');
