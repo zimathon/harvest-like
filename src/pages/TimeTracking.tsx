@@ -493,6 +493,25 @@ const TimeTracking = () => {
     return filterByClient(filterByProject(entries));
   };
 
+  // エントリーからプロジェクトコード付きの名前を取得
+  const getProjectDisplayName = (entry: TimeEntry) => {
+    const projectId = entry.projectId || entry.project?._id || entry.project?.id;
+    const project = projects.find(p => (p._id || p.id) === projectId);
+    const code = project?.code;
+    const name = entry.project?.name || entry.projectName || 'Unknown Project';
+    return code ? `[${code}] ${name}` : name;
+  };
+
+  // エントリーからタスクのサブコード付きの名前を取得
+  const getTaskDisplayName = (entry: TimeEntry) => {
+    const taskName = typeof entry.task === 'string' ? entry.task : entry.task?.name;
+    const projectId = entry.projectId || entry.project?._id || entry.project?.id;
+    const project = projects.find(p => (p._id || p.id) === projectId);
+    const task = project?.tasks?.find(t => t.name === taskName);
+    const subCode = task?.subCode;
+    return subCode ? `[${subCode}] ${taskName || '-'}` : (taskName || '-');
+  };
+
   // Filter time entries for today
   const getTodayEntries = () => {
     const today = getTodayDateString();
@@ -901,7 +920,9 @@ const TimeTracking = () => {
                   }}
                 >
                   {projects.map(project => (
-                    <option key={project._id || project.id} value={project._id || project.id}>{project.name}</option>
+                    <option key={project._id || project.id} value={project._id || project.id}>
+                      {project.code ? `[${project.code}] ` : ''}{project.name}
+                    </option>
                   ))}
                 </Select>
               </FormControl>
@@ -917,7 +938,9 @@ const TimeTracking = () => {
                   {tasks.map(task => {
                     const taskId = task._id || task.id || task.name;
                     return (
-                      <option key={taskId} value={taskId}>{task.name}</option>
+                      <option key={taskId} value={taskId}>
+                        {task.subCode ? `[${task.subCode}] ` : ''}{task.name}
+                      </option>
                     );
                   })}
                 </Select>
@@ -1095,7 +1118,7 @@ const TimeTracking = () => {
             >
               {projects.map(project => (
                 <option key={project._id || project.id} value={project._id || project.id}>
-                  {project.name}
+                  {project.code ? `[${project.code}] ` : ''}{project.name}
                 </option>
               ))}
             </Select>
@@ -1154,8 +1177,8 @@ const TimeTracking = () => {
                     {getTodayEntries().map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
-                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                        <Td>{getProjectDisplayName(entry)}</Td>
+                        <Td>{getTaskDisplayName(entry)}</Td>
                         <Td>{entry.notes || entry.description || '-'}</Td>
                         <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
@@ -1217,8 +1240,8 @@ const TimeTracking = () => {
                     {getWeekEntries().map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
-                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                        <Td>{getProjectDisplayName(entry)}</Td>
+                        <Td>{getTaskDisplayName(entry)}</Td>
                         <Td>{entry.notes || entry.description || '-'}</Td>
                         <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
@@ -1280,8 +1303,8 @@ const TimeTracking = () => {
                     {getMonthEntries().map(entry => (
                       <Tr key={entry._id || entry.id}>
                         <Td>{entry.date}</Td>
-                        <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                        <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                        <Td>{getProjectDisplayName(entry)}</Td>
+                        <Td>{getTaskDisplayName(entry)}</Td>
                         <Td>{entry.notes || entry.description || '-'}</Td>
                         <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                         <Td>
@@ -1356,8 +1379,8 @@ const TimeTracking = () => {
                       {paginatedEntries.map(entry => (
                         <Tr key={entry._id || entry.id}>
                           <Td>{entry.date}</Td>
-                          <Td>{entry.project?.name || entry.projectName || 'Unknown Project'}</Td>
-                          <Td>{typeof entry.task === 'string' ? entry.task : entry.task?.name}</Td>
+                          <Td>{getProjectDisplayName(entry)}</Td>
+                          <Td>{getTaskDisplayName(entry)}</Td>
                           <Td>{entry.notes || '-'}</Td>
                           <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
                           <Td>
