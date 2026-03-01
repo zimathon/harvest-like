@@ -119,8 +119,9 @@ export const getTimeEntriesReport = async (req: AuthRequestFirestore, res: Respo
               projectInfo = {
                 id: project.id!,
                 name: project.name,
+                code: project.code || '',
                 client: null
-              };
+              } as any;
               
               if (project.clientId) {
                 const client = await Client.findById(project.clientId);
@@ -286,6 +287,7 @@ export const getProjectsReport = async (req: AuthRequestFirestore, res: Response
         project: {
           id: project.id,
           name: project.name,
+          code: project.code || '',
           status: project.status,
           client
         },

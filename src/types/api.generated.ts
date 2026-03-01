@@ -716,6 +716,7 @@ export interface components {
         Task: {
             id?: string;
             _id?: string;
+            subCode?: string;
             name?: string;
             description?: string;
             rate?: number;
@@ -729,6 +730,7 @@ export interface components {
         Project: {
             id?: string;
             _id?: string;
+            code?: string;
             name?: string;
             description?: string;
             client?: string;
@@ -752,6 +754,7 @@ export interface components {
         };
         CreateProjectRequest: {
             name: string;
+            code?: string;
             description?: string;
             client?: string;
             /**
@@ -767,6 +770,7 @@ export interface components {
             hourlyRate?: number;
             tasks?: {
                 name?: string;
+                subCode?: string;
                 description?: string;
                 rate?: number;
                 isBillable?: boolean;

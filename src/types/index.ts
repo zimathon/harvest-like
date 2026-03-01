@@ -12,6 +12,7 @@ export interface User {
 export interface Project {
   id: string;
   _id?: string; // For backward compatibility
+  code?: string; // プロジェクトコード（例: "PRJ-001"）
   name: string;
   client?: Client | string; // MongoDB版で使用（オプショナル）
   clientId?: string; // Firestore版で使用
@@ -34,6 +35,7 @@ export interface Project {
 export interface Task {
   id?: string; // Add id property
   _id?: string; // For backward compatibility
+  subCode?: string; // サブコード（例: "PRJ-001-01"）
   name: string;
   description?: string;
   rate?: number;

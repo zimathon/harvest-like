@@ -59,7 +59,8 @@ const Projects = () => {
 
   const filteredProjects = projects.filter(project =>
     project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (project.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) // clientNameで検索（Firestore版）
+    (project.code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (project.clientName || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const handleArchive = async (id: string) => {
@@ -87,6 +88,7 @@ const Projects = () => {
   }
 
   // --- Project Form State ---
+  const [projectCode, setProjectCode] = useState('')
   const [projectName, setProjectName] = useState('')
   const [clientId, setClientId] = useState('')
   const [description, setDescription] = useState('')
@@ -94,7 +96,7 @@ const Projects = () => {
   const [budget, setBudget] = useState<number | string>('')
   const [budgetType, setBudgetType] = useState<'hourly' | 'fixed'>('hourly')
   const [hourlyRate, setHourlyRate] = useState<number | string>('')
-  const [tasks, setTasks] = useState<Array<{ name: string; hourlyRate?: number; isBillable: boolean }>>([])
+  const [tasks, setTasks] = useState<Array<{ name: string; subCode?: string; hourlyRate?: number; isBillable: boolean }>>([])
   // --- Project Form State End ---
 
   // モーダル開閉時の初期化/設定
@@ -104,11 +106,12 @@ const Projects = () => {
       if (selectedProject) {
         console.log('Debug: Setting form for editing project');
         console.log('Debug: selectedProject.client =', selectedProject.client);
+        setProjectCode(selectedProject.code || '')
         setProjectName(selectedProject.name)
         // Firestore版とMongoDB版の両方に対応
         const clientIdValue = selectedProject.clientId || // Firestore版
-          (typeof selectedProject.client === 'string' 
-            ? selectedProject.client 
+          (typeof selectedProject.client === 'string'
+            ? selectedProject.client
             : (selectedProject.client?._id || selectedProject.client?.id)) || '';
         setClientId(clientIdValue)
         setDescription(selectedProject.description || '')
@@ -121,6 +124,7 @@ const Projects = () => {
       } else {
         console.log('Debug: Setting form for new project');
         // 新規作成時はフォームをリセット
+        setProjectCode('')
         setProjectName('')
         setClientId('')
         setDescription('')
@@ -201,6 +205,7 @@ const Projects = () => {
       }
 
       const projectData = {
+        code: projectCode,
         name: projectName,
         client: clientId, // API expects 'client' field
         clientId: clientId, // Keep for backward compatibility
@@ -247,7 +252,9 @@ const Projects = () => {
 
   // タスク管理のヘルパー関数
   const addTask = () => {
-    setTasks([...tasks, { name: '', hourlyRate: 0, isBillable: true }])
+    const nextIndex = tasks.length + 1;
+    const autoSubCode = projectCode ? `${projectCode}-${String(nextIndex).padStart(2, '0')}` : '';
+    setTasks([...tasks, { name: '', subCode: autoSubCode, hourlyRate: 0, isBillable: true }])
   }
 
   const updateTask = (index: number, field: string, value: any) => {
@@ -292,7 +299,7 @@ const Projects = () => {
             <Icon as={MdSearch} color="gray.400" />
           </InputLeftElement>
           <Input
-            placeholder="Search projects (name, client)"
+            placeholder="Search projects (code, name, client)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -303,6 +310,7 @@ const Projects = () => {
         <Table variant="simple">
           <Thead>
             <Tr>
+              <Th>Code</Th>
               <Th>Name</Th>
               <Th>Client</Th>
               <Th>Status</Th>
@@ -317,6 +325,13 @@ const Projects = () => {
 
               return (
                 <Tr key={project._id || project.id}>
+                  <Td>
+                    {project.code ? (
+                      <Badge colorScheme="purple" fontSize="xs">{project.code}</Badge>
+                    ) : (
+                      <Text color="gray.400" fontSize="xs">-</Text>
+                    )}
+                  </Td>
                   <Td fontWeight="medium">{project.name}</Td>
                   <Td>{clientName}</Td>
                   <Td>
@@ -368,14 +383,25 @@ const Projects = () => {
           <ModalBody pb={6}>
             <Box as="form" onSubmit={(e: React.FormEvent<HTMLDivElement>) => e.preventDefault()}>
               <VStack spacing={4}>
-                <FormControl isRequired>
-                  <FormLabel>Project Name</FormLabel>
-                  <Input
-                    placeholder="Enter project name"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                  />
-                </FormControl>
+                <HStack w="full" spacing={4}>
+                  <FormControl flex={1}>
+                    <FormLabel>Project Code</FormLabel>
+                    <Input
+                      placeholder="e.g. PRJ-001"
+                      value={projectCode}
+                      onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
+                      size="md"
+                    />
+                  </FormControl>
+                  <FormControl flex={2} isRequired>
+                    <FormLabel>Project Name</FormLabel>
+                    <Input
+                      placeholder="Enter project name"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                    />
+                  </FormControl>
+                </HStack>
 
                 <FormControl isRequired>
                   <FormLabel>Client</FormLabel>
@@ -472,39 +498,49 @@ const Projects = () => {
                   ) : (
                     <VStack spacing={3} align="stretch">
                       {tasks.map((task, index) => (
-                        <HStack key={index} spacing={2} p={3} border="1px" borderColor="gray.200" borderRadius="md">
-                          <Input
-                            placeholder="Task name"
-                            value={task.name}
-                            onChange={(e) => updateTask(index, 'name', e.target.value)}
-                            size="sm"
-                            flex={2}
-                          />
-                          <NumberInput
-                            size="sm"
-                            min={0}
-                            flex={1}
-                            value={task.hourlyRate || ''}
-                            onChange={(value) => updateTask(index, 'hourlyRate', parseFloat(value) || 0)}
-                          >
-                            <NumberInputField placeholder="Rate" />
-                          </NumberInput>
-                          <Checkbox
-                            isChecked={task.isBillable}
-                            onChange={(e) => updateTask(index, 'isBillable', e.target.checked)}
-                          >
-                            Billable
-                          </Checkbox>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="red"
-                            onClick={() => removeTask(index)}
-                            type="button"
-                          >
-                            <MdDelete />
-                          </Button>
-                        </HStack>
+                        <Box key={index} p={3} border="1px" borderColor="gray.200" borderRadius="md">
+                          <HStack spacing={2} mb={2}>
+                            <Input
+                              placeholder="Sub Code"
+                              value={task.subCode || ''}
+                              onChange={(e) => updateTask(index, 'subCode', e.target.value.toUpperCase())}
+                              size="sm"
+                              flex={1}
+                              maxW="120px"
+                            />
+                            <Input
+                              placeholder="Task name"
+                              value={task.name}
+                              onChange={(e) => updateTask(index, 'name', e.target.value)}
+                              size="sm"
+                              flex={2}
+                            />
+                            <NumberInput
+                              size="sm"
+                              min={0}
+                              flex={1}
+                              value={task.hourlyRate || ''}
+                              onChange={(value) => updateTask(index, 'hourlyRate', parseFloat(value) || 0)}
+                            >
+                              <NumberInputField placeholder="Rate" />
+                            </NumberInput>
+                            <Checkbox
+                              isChecked={task.isBillable}
+                              onChange={(e) => updateTask(index, 'isBillable', e.target.checked)}
+                            >
+                              Billable
+                            </Checkbox>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              colorScheme="red"
+                              onClick={() => removeTask(index)}
+                              type="button"
+                            >
+                              <MdDelete />
+                            </Button>
+                          </HStack>
+                        </Box>
                       ))}
                     </VStack>
                   )}

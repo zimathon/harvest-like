@@ -4,6 +4,7 @@ import { Timestamp } from '@google-cloud/firestore';
 export interface ITask {
   id: string;
   name: string;
+  subCode?: string;
   hourlyRate?: number;
   isBillable: boolean;
 }
@@ -15,6 +16,7 @@ export interface IProjectMember {
 
 export interface IProject {
   id?: string;
+  code?: string;
   name: string;
   description?: string;
   clientId: string;
@@ -39,13 +41,15 @@ export class ProjectModel {
 
   async create(projectData: Omit<IProject, 'id' | 'createdAt' | 'updatedAt'>): Promise<IProject> {
     const now = Timestamp.now();
-    
-    // Ensure tasks have IDs
+
+    // Ensure tasks have IDs and subCodes
+    const projectCode = projectData.code || '';
     const tasksWithIds = projectData.tasks.map((task, index) => ({
       ...task,
-      id: task.id || `task_${Date.now()}_${index}`
+      id: task.id || `task_${Date.now()}_${index}`,
+      subCode: task.subCode || (projectCode ? `${projectCode}-${String(index + 1).padStart(2, '0')}` : '')
     }));
-    
+
     const project: Omit<IProject, 'id'> = {
       ...projectData,
       tasks: tasksWithIds,
@@ -167,11 +171,13 @@ export class ProjectModel {
       updatedAt: Timestamp.now()
     };
 
-    // Ensure tasks have IDs if updating tasks
+    // Ensure tasks have IDs and subCodes if updating tasks
     if (updateFields.tasks) {
+      const projectCode = updateFields.code || '';
       updateFields.tasks = updateFields.tasks.map((task, index) => ({
         ...task,
-        id: task.id || `task_${Date.now()}_${index}`
+        id: task.id || `task_${Date.now()}_${index}`,
+        subCode: task.subCode || (projectCode ? `${projectCode}-${String(index + 1).padStart(2, '0')}` : '')
       }));
     }
 

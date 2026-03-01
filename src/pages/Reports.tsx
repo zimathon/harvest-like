@@ -132,10 +132,11 @@ const Reports = () => {
     const summary = reportData.reduce((acc, entry) => {
       const projectId = entry.project?.id || entry.projectId || '';
       if (!acc[projectId]) {
-        // Get client name from projects list
+        // Get client name and code from projects list
         const projectData = projects.find(p => p.id === projectId);
         acc[projectId] = {
           project: entry.project || { id: projectId, name: entry.projectName || 'Unknown' },
+          projectCode: projectData?.code || '',
           clientName: projectData?.clientName || 'Unknown Client',
           totalHours: 0,
           billableHours: 0,
@@ -173,26 +174,43 @@ const Reports = () => {
     return map;
   }, [projects]);
 
+  // Create a map of project ID to project code
+  const projectCodeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    projects.forEach(project => {
+      if (project.id) {
+        map[project.id] = project.code || '';
+      }
+    });
+    return map;
+  }, [projects]);
+
   // Daily entries sorted by date
   const dailyEntries = useMemo(() => {
     return reportData
       .map(entry => {
         const hours = entry.hours || ((entry.duration || 0) / 3600);
         const projectId = entry.project?.id || entry.projectId || '';
+        const projectData = projects.find(p => p.id === projectId);
+        const taskName = typeof entry.task === 'string' ? entry.task : (entry.task as any)?.name || '-';
+        const taskData = projectData?.tasks?.find(t => t.name === taskName);
         return {
           ...entry,
           calculatedHours: hours,
+          projectCode: projectCodeMap[projectId] || '',
           projectName: entry.project?.name || entry.projectName || 'Unknown',
-          clientName: projectClientMap[projectId] || 'Unknown Client'
+          clientName: projectClientMap[projectId] || 'Unknown Client',
+          taskSubCode: taskData?.subCode || ''
         };
       })
       .sort((a, b) => {
-        // Sort by date (ascending), then by project name
+        // Sort by date (ascending), then by project code/name
         const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
         if (dateCompare !== 0) return dateCompare;
+        if (a.projectCode && b.projectCode) return a.projectCode.localeCompare(b.projectCode);
         return a.projectName.localeCompare(b.projectName);
       });
-  }, [reportData, projectClientMap]);
+  }, [reportData, projectClientMap, projectCodeMap, projects]);
 
   // Calculate total statistics
   const totalStats = useMemo(() => {
@@ -223,24 +241,24 @@ const Reports = () => {
     // Export based on active tab
     if (activeTab === 1) {
       // Daily Breakdown
-      csvContent = 'Date,Day,Client,Project,Task,Notes,Hours,Type\n';
+      csvContent = 'Date,Day,Project Code,Client,Project,Sub Code,Task,Notes,Hours,Type\n';
       dailyEntries.forEach(entry => {
         const dateInfo = formatDateWithDay(entry.date);
         const notes = entry.notes || entry.description || '-';
-        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.clientName}","${entry.projectName}","${entry.task || '-'}","${notes}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
+        csvContent += `"${dateInfo.formatted}","${dateInfo.dayOfWeek}","${entry.projectCode || ''}","${entry.clientName}","${entry.projectName}","${entry.taskSubCode || ''}","${entry.task || '-'}","${notes}",${entry.calculatedHours.toFixed(2)},"${entry.isBillable ? 'Billable' : 'Non-Billable'}"\n`;
       });
       filename = 'daily-breakdown-report.csv';
     } else if (activeTab === 2) {
       // Project Summary
-      csvContent = 'Client,Project,Total Hours,Billable Hours,Non-Billable Hours,Billable %,Team Members\n';
+      csvContent = 'Project Code,Client,Project,Total Hours,Billable Hours,Non-Billable Hours,Billable %,Team Members\n';
       projectSummary.forEach(project => {
         const billablePercentage = project.totalHours > 0 ? (project.billableHours / project.totalHours) * 100 : 0;
-        csvContent += `"${project.clientName}","${project.project.name}",${project.totalHours.toFixed(2)},${project.billableHours.toFixed(2)},${(project.totalHours - project.billableHours).toFixed(2)},${billablePercentage.toFixed(0)}%,${project.userCount}\n`;
+        csvContent += `"${project.projectCode || ''}","${project.clientName}","${project.project.name}",${project.totalHours.toFixed(2)},${project.billableHours.toFixed(2)},${(project.totalHours - project.billableHours).toFixed(2)},${billablePercentage.toFixed(0)}%,${project.userCount}\n`;
       });
       filename = 'project-summary-report.csv';
     } else {
       // Time Summary - Export raw data (sorted by date ascending)
-      csvContent = 'Date,Client,Project,Task,Notes,Hours,Billable\n';
+      csvContent = 'Date,Project Code,Client,Project,Sub Code,Task,Notes,Hours,Billable\n';
       const sortedData = [...reportData].sort((a, b) =>
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
@@ -248,7 +266,12 @@ const Reports = () => {
         const hours = entry.hours || ((entry.duration || 0) / 3600);
         const projectId = entry.project?.id || entry.projectId || '';
         const clientName = projectClientMap[projectId] || 'Unknown Client';
-        csvContent += `"${entry.date}","${clientName}","${entry.project?.name || entry.projectName || 'Unknown'}","${entry.task || '-'}","${entry.notes || entry.description || '-'}",${hours.toFixed(2)},${entry.isBillable ? 'Yes' : 'No'}\n`;
+        const pCode = projectCodeMap[projectId] || '';
+        const projectData = projects.find(p => p.id === projectId);
+        const taskName = typeof entry.task === 'string' ? entry.task : (entry.task as any)?.name || '-';
+        const taskData = projectData?.tasks?.find(t => t.name === taskName);
+        const subCode = taskData?.subCode || '';
+        csvContent += `"${entry.date}","${pCode}","${clientName}","${entry.project?.name || entry.projectName || 'Unknown'}","${subCode}","${taskName}","${entry.notes || entry.description || '-'}",${hours.toFixed(2)},${entry.isBillable ? 'Yes' : 'No'}\n`;
       });
       filename = 'time-entries-report.csv';
     }
@@ -271,7 +294,7 @@ const Reports = () => {
       duration: 3000,
       isClosable: true
     });
-  }, [reportGenerated, reportData, activeTab, dailyEntries, projectSummary]);
+  }, [reportGenerated, reportData, activeTab, dailyEntries, projectSummary, projectClientMap, projectCodeMap, projects]);
 
   if (projectsLoading || usersLoading) {
     return (
@@ -327,7 +350,9 @@ const Reports = () => {
                   <Select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)}>
                     <option value="all">All Projects</option>
                     {projects.map(project => (
-                      <option key={project.id} value={project.id}>{project.name}</option>
+                      <option key={project.id} value={project.id}>
+                        {project.code ? `[${project.code}] ` : ''}{project.name}
+                      </option>
                     ))}
                   </Select>
                 </FormControl>
@@ -422,7 +447,9 @@ const Reports = () => {
                             <Tr>
                               <Th>Date</Th>
                               <Th>Day</Th>
+                              <Th>Code</Th>
                               <Th>Project</Th>
+                              <Th>Sub Code</Th>
                               <Th>Task</Th>
                               <Th isNumeric>Hours</Th>
                               <Th>Type</Th>
@@ -439,7 +466,17 @@ const Reports = () => {
                                       {dateInfo.dayOfWeek}
                                     </Badge>
                                   </Td>
+                                  <Td>
+                                    {entry.projectCode ? (
+                                      <Badge colorScheme="purple" fontSize="xs">{entry.projectCode}</Badge>
+                                    ) : '-'}
+                                  </Td>
                                   <Td>{entry.projectName}</Td>
+                                  <Td>
+                                    {entry.taskSubCode ? (
+                                      <Badge colorScheme="teal" fontSize="xs">{entry.taskSubCode}</Badge>
+                                    ) : '-'}
+                                  </Td>
                                   <Td>{typeof entry.task === 'string' ? entry.task : (entry.task ? 'Task' : '-')}</Td>
                                   <Td isNumeric>{formatHours(entry.calculatedHours)}</Td>
                                   <Td>
@@ -473,6 +510,7 @@ const Reports = () => {
                         <Table variant="simple">
                           <Thead>
                             <Tr>
+                              <Th>Code</Th>
                               <Th>Project</Th>
                               <Th isNumeric>Total Hours</Th>
                               <Th isNumeric>Billable Hours</Th>
@@ -483,11 +521,16 @@ const Reports = () => {
                           </Thead>
                           <Tbody>
                             {projectSummary.map((project) => {
-                              const billablePercentage = project.totalHours > 0 
-                                ? (project.billableHours / project.totalHours) * 100 
+                              const billablePercentage = project.totalHours > 0
+                                ? (project.billableHours / project.totalHours) * 100
                                 : 0;
                               return (
                                 <Tr key={project.project.id}>
+                                  <Td>
+                                    {project.projectCode ? (
+                                      <Badge colorScheme="purple" fontSize="xs">{project.projectCode}</Badge>
+                                    ) : '-'}
+                                  </Td>
                                   <Td>{project.project.name}</Td>
                                   <Td isNumeric>{formatHours(project.totalHours)}</Td>
                                   <Td isNumeric>{formatHours(project.billableHours)}</Td>
