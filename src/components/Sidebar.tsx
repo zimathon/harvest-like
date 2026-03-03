@@ -109,6 +109,7 @@ export const MobileHeader = () => {
         color="white"
         px={4}
         py={3}
+        pt="calc(12px + env(safe-area-inset-top))"
         align="center"
         position="sticky"
         top={0}

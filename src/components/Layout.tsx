@@ -11,7 +11,13 @@ const Layout = ({ children }: LayoutProps) => {
     <Flex h="100vh" direction={{ base: 'column', md: 'row' }}>
       <Sidebar />
       <MobileHeader />
-      <Box flex="1" p={{ base: 3, md: 5 }} overflowY="auto">
+      <Box
+        flex="1"
+        p={{ base: 3, md: 5 }}
+        pb={{ base: 'calc(12px + env(safe-area-inset-bottom))', md: 5 }}
+        overflowY="auto"
+        sx={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {children}
       </Box>
     </Flex>

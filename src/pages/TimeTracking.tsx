@@ -913,23 +913,29 @@ const TimeTracking = () => {
                   {entry.notes || entry.description}
                 </Text>
               )}
-              <Text fontSize="xs" color="gray.400" mt={1}>{entry.date}</Text>
+              <Flex align="center" gap={2} mt={1}>
+                <Text fontSize="xs" color="gray.400">{entry.date}</Text>
+                <Text fontWeight="bold" fontSize="sm" color={entry.isRunning ? 'green.500' : 'blue.600'}>
+                  {entry.isRunning ? `${durationDisplay} ▶` : durationDisplay}
+                </Text>
+              </Flex>
             </Box>
-            <Flex align="center" gap={1}>
-              <Text fontWeight="bold" fontSize="sm" color={entry.isRunning ? 'green.500' : 'blue.600'} mr={1}>
-                {entry.isRunning ? `${durationDisplay} ▶` : durationDisplay}
-              </Text>
+            <Flex align="center" gap={0}>
               <IconButton
                 aria-label="Edit"
                 icon={<MdEdit />}
-                size="sm"
+                size="md"
+                minW="44px"
+                minH="44px"
                 variant="ghost"
                 onClick={() => handleEditEntry(entry)}
               />
               <IconButton
                 aria-label="Delete"
                 icon={<MdDelete />}
-                size="sm"
+                size="md"
+                minW="44px"
+                minH="44px"
                 variant="ghost"
                 colorScheme="red"
                 onClick={() => handleDeleteEntry(entry._id || entry.id)}
@@ -1008,22 +1014,23 @@ const TimeTracking = () => {
           <VStack spacing={4} align="stretch">
             {selectedTimeEntry && (
               <Box p={3} bg="blue.50" borderRadius="md" border="1px" borderColor="blue.200">
-                <Flex justify="space-between" align="center">
-                  <Text fontWeight="bold" color="blue.600">
-                    Editing Time Entry: {selectedTimeEntry.projectName || selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
+                <Flex justify="space-between" align="center" direction={{ base: 'column', sm: 'row' }} gap={2}>
+                  <Text fontWeight="bold" color="blue.600" fontSize={{ base: 'sm', md: 'md' }} noOfLines={2}>
+                    Editing: {selectedTimeEntry.projectName || selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
                   </Text>
-                  <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                  <Button size="sm" variant="ghost" onClick={handleCancelEdit} flexShrink={0}>
                     Cancel Edit
                   </Button>
                 </Flex>
               </Box>
             )}
-            <Stack direction={{ base: 'column', md: 'row' }} spacing={4}>
+            <Stack direction={{ base: 'column', md: 'row' }} spacing={{ base: 3, md: 4 }}>
               <FormControl>
-                <FormLabel>Project</FormLabel>
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Project</FormLabel>
                 <Select
                   placeholder="Select project"
                   value={selectedProjectId}
+                  size={{ base: 'lg', md: 'md' }}
                   onChange={(e) => {
                     const newProjectId = e.target.value;
                     setSelectedProjectId(newProjectId);
@@ -1042,10 +1049,11 @@ const TimeTracking = () => {
               </FormControl>
 
               <FormControl>
-                <FormLabel>Task</FormLabel>
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Task</FormLabel>
                 <Select
                   placeholder="Select task"
                   value={selectedTaskId || ''}
+                  size={{ base: 'lg', md: 'md' }}
                   onChange={(e) => setSelectedTaskId(e.target.value)}
                   isDisabled={!selectedProjectId || tasks.length === 0}
                 >
@@ -1061,28 +1069,30 @@ const TimeTracking = () => {
               </FormControl>
             </Stack>
             
-            <Stack direction={{ base: 'column', md: 'row' }} spacing={4}>
+            <Stack direction={{ base: 'column', md: 'row' }} spacing={{ base: 3, md: 4 }}>
               <FormControl>
-                <FormLabel>Time</FormLabel>
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Time</FormLabel>
                 <Input
                   type="text"
-                  placeholder="1:30 or 1h 30m or 1.5 (hours)"
+                  placeholder="1:30 or 1h 30m or 1.5"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   disabled={activeEntry !== null}
+                  size={{ base: 'lg', md: 'md' }}
+                  inputMode="decimal"
                 />
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  Format: "1:30" (hours:minutes) or "1h 30m" or "1.5" (hours)
+                  Format: "1:30" or "1h 30m" or "1.5" (hours)
                 </Text>
               </FormControl>
 
               <FormControl>
-                <FormLabel>Date</FormLabel>
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Date</FormLabel>
                 <HStack spacing={2}>
                   <IconButton
                     aria-label="Previous day"
                     icon={<MdChevronLeft />}
-                    size="md"
+                    size={{ base: 'lg', md: 'md' }}
                     variant="outline"
                     onClick={() => setDate(adjustDate(date, -1))}
                     isDisabled={activeEntry !== null}
@@ -1094,16 +1104,18 @@ const TimeTracking = () => {
                           <Button
                             variant="outline"
                             leftIcon={<MdCalendarToday />}
+                            flex="1"
                             minW={{ base: '120px', md: '160px' }}
                             justifyContent="flex-start"
                             fontWeight="normal"
                             fontSize={{ base: 'sm', md: 'md' }}
+                            size={{ base: 'lg', md: 'md' }}
                             isDisabled={activeEntry !== null}
                           >
                             {formatDateForDisplay(date)}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent w="auto">
+                        <PopoverContent w="auto" maxW="calc(100vw - 32px)">
                           <PopoverBody p={0}>
                             <Calendar
                               selectedDate={date}
@@ -1119,7 +1131,7 @@ const TimeTracking = () => {
                   <IconButton
                     aria-label="Next day"
                     icon={<MdChevronRight />}
-                    size="md"
+                    size={{ base: 'lg', md: 'md' }}
                     variant="outline"
                     onClick={() => {
                       const newDate = adjustDate(date, 1);
@@ -1134,11 +1146,13 @@ const TimeTracking = () => {
             </Stack>
             
             <FormControl>
-              <FormLabel>Notes</FormLabel>
-              <Textarea 
-                placeholder="Add notes about this time entry" 
+              <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Notes</FormLabel>
+              <Textarea
+                placeholder="Add notes about this time entry"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                size={{ base: 'lg', md: 'md' }}
               />
             </FormControl>
             
@@ -1155,6 +1169,8 @@ const TimeTracking = () => {
                   colorScheme="red"
                   onClick={handleStopTimer}
                   w={{ base: 'full', sm: 'auto' }}
+                  size={{ base: 'lg', md: 'md' }}
+                  h={{ base: '52px', md: '40px' }}
                 >
                   Stop Timer
                 </Button>
@@ -1164,6 +1180,8 @@ const TimeTracking = () => {
                   colorScheme="green"
                   onClick={handleStartTimer}
                   w={{ base: 'full', sm: 'auto' }}
+                  size={{ base: 'lg', md: 'md' }}
+                  h={{ base: '52px', md: '40px' }}
                 >
                   {selectedTimeEntry ? 'Resume Timer' : 'Start Timer'}
                 </Button>
@@ -1174,27 +1192,35 @@ const TimeTracking = () => {
                 onClick={handleSaveTimeEntry}
                 disabled={activeEntry !== null}
                 w={{ base: 'full', sm: 'auto' }}
+                size={{ base: 'lg', md: 'md' }}
+                h={{ base: '52px', md: '40px' }}
               >
                 {selectedTimeEntry ? 'Update Entry' : 'Save Entry'}
               </Button>
             </Stack>
             
             {activeEntry && (
-              <Box p={3} bg="green.50" borderRadius="md">
-                <Flex justify="space-between" align="center">
-                  <Box>
-                    <Text fontWeight="bold">Timer Running</Text>
-                    <Text>{activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {typeof activeEntry.task === 'string' ? activeEntry.task : activeEntry.task?.name}</Text>
-                    <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
+              <Box p={{ base: 4, md: 3 }} bg="green.50" borderRadius="md">
+                <Flex justify="space-between" align="center" direction={{ base: 'column', sm: 'row' }} gap={2}>
+                  <Box textAlign={{ base: 'center', sm: 'left' }} w="full">
+                    <Flex justify={{ base: 'center', sm: 'flex-start' }} align="center" gap={2} mb={1}>
+                      <Text fontWeight="bold" fontSize={{ base: 'md', md: 'md' }}>Timer Running</Text>
+                      <Badge colorScheme="green" p={1} borderRadius="md" fontSize="xs">
+                        Running
+                      </Badge>
+                    </Flex>
+                    <Text fontSize={{ base: 'sm', md: 'md' }} noOfLines={1}>
+                      {activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {typeof activeEntry.task === 'string' ? activeEntry.task : activeEntry.task?.name}
+                    </Text>
+                    {activeEntry.notes && (
+                      <Text fontSize="sm" color="gray.600" noOfLines={1}>{activeEntry.notes}</Text>
+                    )}
                     {activeEntry.startTime && (
-                      <Text fontSize="lg" fontWeight="bold" color="green.600">
+                      <Text fontSize={{ base: '2xl', md: 'lg' }} fontWeight="bold" color="green.600" mt={1}>
                         {formatTime(getElapsedTime(activeEntry.startTime, activeEntry.duration || 0))}
                       </Text>
                     )}
                   </Box>
-                  <Badge colorScheme="green" p={2} borderRadius="md">
-                    Running
-                  </Badge>
                 </Flex>
               </Box>
             )}
@@ -1215,7 +1241,7 @@ const TimeTracking = () => {
                   setFilterClientId(e.target.value);
                   setCurrentPage(1);
                 }}
-                size={{ base: 'sm', md: 'md' }}
+                size={{ base: 'md', md: 'md' }}
               >
                 {clients.map(client => (
                   <option key={client._id || client.id} value={client._id || client.id}>
@@ -1235,7 +1261,7 @@ const TimeTracking = () => {
                   setFilterProjectId(e.target.value);
                   setCurrentPage(1);
                 }}
-                size={{ base: 'sm', md: 'md' }}
+                size={{ base: 'md', md: 'md' }}
               >
                 {projects.map(project => (
                   <option key={project._id || project.id} value={project._id || project.id}>
@@ -1248,7 +1274,7 @@ const TimeTracking = () => {
         </Stack>
         {(filterProjectId || filterClientId) && (
           <Button
-            size="sm"
+            size={{ base: 'md', md: 'sm' }}
             variant="ghost"
             onClick={() => {
               setFilterProjectId('');

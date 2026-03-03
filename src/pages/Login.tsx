@@ -72,19 +72,23 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your.email@example.com"
+                  size={{ base: 'lg', md: 'md' }}
+                  autoComplete="email"
+                  autoCapitalize="none"
                 />
               </FormControl>
 
               <FormControl id="password" isRequired>
                 <FormLabel>Password</FormLabel>
-                <InputGroup>
+                <InputGroup size={{ base: 'lg', md: 'md' }}>
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
+                    autoComplete="current-password"
                   />
-                  <InputRightElement>
+                  <InputRightElement h="full">
                     <Button
                       variant="ghost"
                       onClick={() => setShowPassword(!showPassword)}
@@ -106,7 +110,8 @@ const Login = () => {
                 mt={4}
                 type="submit"
                 isLoading={isLoading}
-                size={{ base: 'lg', md: 'md' }}
+                size="lg"
+                h={{ base: '52px', md: '44px' }}
               >
                 Sign In
               </Button>
