@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Box, Flex } from '@chakra-ui/react'
-import Sidebar from './Sidebar'
+import Sidebar, { MobileHeader } from './Sidebar'
 
 interface LayoutProps {
   children: ReactNode
@@ -8,9 +8,10 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   return (
-    <Flex h="100vh">
+    <Flex h="100vh" direction={{ base: 'column', md: 'row' }}>
       <Sidebar />
-      <Box flex="1" p={5} overflowY="auto">
+      <MobileHeader />
+      <Box flex="1" p={{ base: 3, md: 5 }} overflowY="auto">
         {children}
       </Box>
     </Flex>

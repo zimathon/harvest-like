@@ -55,12 +55,12 @@ const Login = () => {
   };
 
   return (
-    <Flex minH="100vh" alignItems="center" justifyContent="center" bg="gray.50">
-      <Container maxW="md" p={8} bg="white" borderRadius="md" boxShadow="md">
+    <Flex minH="100vh" alignItems="center" justifyContent="center" bg="gray.50" px={{ base: 4, md: 0 }}>
+      <Container maxW="md" p={{ base: 6, md: 8 }} bg="white" borderRadius="md" boxShadow="md" w="full">
         <VStack spacing={6} align="stretch">
           <Box textAlign="center">
-            <Heading mb={2}>Harvest-like</Heading>
-            <Text color="gray.600">Sign in to your account</Text>
+            <Heading mb={2} size={{ base: 'lg', md: 'xl' }}>Harvest-like</Heading>
+            <Text color="gray.600" fontSize={{ base: 'sm', md: 'md' }}>Sign in to your account</Text>
           </Box>
 
           <Box as="form" onSubmit={handleSubmit}>
@@ -106,6 +106,7 @@ const Login = () => {
                 mt={4}
                 type="submit"
                 isLoading={isLoading}
+                size={{ base: 'lg', md: 'md' }}
               >
                 Sign In
               </Button>
