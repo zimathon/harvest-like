@@ -4,6 +4,7 @@ import {
   Heading,
   VStack,
   HStack,
+  Stack,
   Button,
   Select,
   Input,
@@ -26,6 +27,7 @@ import {
   Td,
   IconButton,
   useToast,
+  useBreakpointValue,
   Spinner,
   Badge,
   Flex,
@@ -884,32 +886,151 @@ const TimeTracking = () => {
     setDuration('');
     setNotes('');
   };
-  
+
+  const isMobile = useBreakpointValue({ base: true, md: false });
+
+  // Mobile card view for a single time entry
+  const renderEntryCard = (entry: TimeEntry) => {
+    const durationDisplay = entry.isRunning
+      ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0))
+      : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0
+        ? formatTime(entry.hours * 3600)
+        : formatTime(entry.duration || 0));
+
+    return (
+      <Card key={entry._id || entry.id} size="sm" variant="outline" mb={2}>
+        <CardBody py={3} px={4}>
+          <Flex justify="space-between" align="flex-start">
+            <Box flex="1" mr={2}>
+              <Text fontWeight="bold" fontSize="sm" noOfLines={1}>
+                {getProjectDisplayName(entry)}
+              </Text>
+              <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                {getTaskDisplayName(entry)}
+              </Text>
+              {(entry.notes || entry.description) && (
+                <Text fontSize="xs" color="gray.500" mt={1} noOfLines={1}>
+                  {entry.notes || entry.description}
+                </Text>
+              )}
+              <Flex align="center" gap={2} mt={1}>
+                <Text fontSize="xs" color="gray.400">{entry.date}</Text>
+                <Text fontWeight="bold" fontSize="sm" color={entry.isRunning ? 'green.500' : 'blue.600'}>
+                  {entry.isRunning ? `${durationDisplay} ▶` : durationDisplay}
+                </Text>
+              </Flex>
+            </Box>
+            <Flex align="center" gap={0}>
+              <IconButton
+                aria-label="Edit"
+                icon={<MdEdit />}
+                size="md"
+                minW="44px"
+                minH="44px"
+                variant="ghost"
+                onClick={() => handleEditEntry(entry)}
+              />
+              <IconButton
+                aria-label="Delete"
+                icon={<MdDelete />}
+                size="md"
+                minW="44px"
+                minH="44px"
+                variant="ghost"
+                colorScheme="red"
+                onClick={() => handleDeleteEntry(entry._id || entry.id)}
+              />
+            </Flex>
+          </Flex>
+        </CardBody>
+      </Card>
+    );
+  };
+
+  // Render entries as table (desktop) or cards (mobile)
+  const renderEntries = (entries: TimeEntry[]) => {
+    if (entries.length === 0) return null;
+
+    if (isMobile) {
+      return (
+        <VStack spacing={0} align="stretch">
+          {entries.map(renderEntryCard)}
+        </VStack>
+      );
+    }
+
+    return (
+      <Table variant="simple">
+        <Thead>
+          <Tr>
+            <Th>Date</Th>
+            <Th>Project</Th>
+            <Th>Task</Th>
+            <Th>Notes</Th>
+            <Th>Duration</Th>
+            <Th>Actions</Th>
+          </Tr>
+        </Thead>
+        <Tbody>
+          {entries.map(entry => (
+            <Tr key={entry._id || entry.id}>
+              <Td>{entry.date}</Td>
+              <Td>{getProjectDisplayName(entry)}</Td>
+              <Td>{getTaskDisplayName(entry)}</Td>
+              <Td>{entry.notes || entry.description || '-'}</Td>
+              <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
+              <Td>
+                <HStack spacing={2}>
+                  <IconButton
+                    aria-label="Edit"
+                    icon={<MdEdit />}
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleEditEntry(entry)}
+                  />
+                  <IconButton
+                    aria-label="Delete"
+                    icon={<MdDelete />}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="red"
+                    onClick={() => handleDeleteEntry(entry._id || entry.id)}
+                  />
+                </HStack>
+              </Td>
+            </Tr>
+          ))}
+        </Tbody>
+      </Table>
+    );
+  };
+
   return (
     <Box>
-      <Heading mb={6}>Time Tracking</Heading>
+      <Heading mb={6} size={{ base: 'lg', md: 'xl' }}>Time Tracking</Heading>
       
       <Card mb={5}>
         <CardBody>
           <VStack spacing={4} align="stretch">
             {selectedTimeEntry && (
               <Box p={3} bg="blue.50" borderRadius="md" border="1px" borderColor="blue.200">
-                <Flex justify="space-between" align="center">
-                  <Text fontWeight="bold" color="blue.600">
-                    Editing Time Entry: {selectedTimeEntry.projectName || selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
+                <Flex justify="space-between" align="center" direction={{ base: 'column', sm: 'row' }} gap={2}>
+                  <Text fontWeight="bold" color="blue.600" fontSize={{ base: 'sm', md: 'md' }} noOfLines={2}>
+                    Editing: {selectedTimeEntry.projectName || selectedTimeEntry.project?.name || 'Unknown Project'} - {typeof selectedTimeEntry.task === 'string' ? selectedTimeEntry.task : selectedTimeEntry.task?.name}
                   </Text>
-                  <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                  <Button size="sm" variant="ghost" onClick={handleCancelEdit} flexShrink={0}>
                     Cancel Edit
                   </Button>
                 </Flex>
               </Box>
             )}
-            <HStack spacing={4}>
+            <Stack direction={{ base: 'column', md: 'row' }} spacing={{ base: 3, md: 4 }}>
               <FormControl>
-                <FormLabel>Project</FormLabel>
-                <Select 
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Project</FormLabel>
+                <Select
                   placeholder="Select project"
                   value={selectedProjectId}
+                  size={{ base: 'lg', md: 'md' }}
                   onChange={(e) => {
                     const newProjectId = e.target.value;
                     setSelectedProjectId(newProjectId);
@@ -926,14 +1047,15 @@ const TimeTracking = () => {
                   ))}
                 </Select>
               </FormControl>
-              
+
               <FormControl>
-                <FormLabel>Task</FormLabel>
-                <Select 
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Task</FormLabel>
+                <Select
                   placeholder="Select task"
                   value={selectedTaskId || ''}
+                  size={{ base: 'lg', md: 'md' }}
                   onChange={(e) => setSelectedTaskId(e.target.value)}
-                  isDisabled={!selectedProjectId || tasks.length === 0} // プロジェクトが選択されていないか、タスクがない場合は選択不可
+                  isDisabled={!selectedProjectId || tasks.length === 0}
                 >
                   {tasks.map(task => {
                     const taskId = task._id || task.id || task.name;
@@ -945,30 +1067,32 @@ const TimeTracking = () => {
                   })}
                 </Select>
               </FormControl>
-            </HStack>
+            </Stack>
             
-            <HStack spacing={4}>
+            <Stack direction={{ base: 'column', md: 'row' }} spacing={{ base: 3, md: 4 }}>
               <FormControl>
-                <FormLabel>Time</FormLabel>
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Time</FormLabel>
                 <Input
                   type="text"
-                  placeholder="1:30 or 1h 30m or 1.5 (hours)"
+                  placeholder="1:30 or 1h 30m or 1.5"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   disabled={activeEntry !== null}
+                  size={{ base: 'lg', md: 'md' }}
+                  inputMode="decimal"
                 />
                 <Text fontSize="xs" color="gray.500" mt={1}>
-                  Format: "1:30" (hours:minutes) or "1h 30m" or "1.5" (hours)
+                  Format: "1:30" or "1h 30m" or "1.5" (hours)
                 </Text>
               </FormControl>
-              
+
               <FormControl>
-                <FormLabel>Date</FormLabel>
+                <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Date</FormLabel>
                 <HStack spacing={2}>
                   <IconButton
                     aria-label="Previous day"
                     icon={<MdChevronLeft />}
-                    size="md"
+                    size={{ base: 'lg', md: 'md' }}
                     variant="outline"
                     onClick={() => setDate(adjustDate(date, -1))}
                     isDisabled={activeEntry !== null}
@@ -980,15 +1104,18 @@ const TimeTracking = () => {
                           <Button
                             variant="outline"
                             leftIcon={<MdCalendarToday />}
-                            minW="160px"
+                            flex="1"
+                            minW={{ base: '120px', md: '160px' }}
                             justifyContent="flex-start"
                             fontWeight="normal"
+                            fontSize={{ base: 'sm', md: 'md' }}
+                            size={{ base: 'lg', md: 'md' }}
                             isDisabled={activeEntry !== null}
                           >
                             {formatDateForDisplay(date)}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent w="auto">
+                        <PopoverContent w="auto" maxW="calc(100vw - 32px)">
                           <PopoverBody p={0}>
                             <Calendar
                               selectedDate={date}
@@ -1004,7 +1131,7 @@ const TimeTracking = () => {
                   <IconButton
                     aria-label="Next day"
                     icon={<MdChevronRight />}
-                    size="md"
+                    size={{ base: 'lg', md: 'md' }}
                     variant="outline"
                     onClick={() => {
                       const newDate = adjustDate(date, 1);
@@ -1016,14 +1143,16 @@ const TimeTracking = () => {
                   />
                 </HStack>
               </FormControl>
-            </HStack>
+            </Stack>
             
             <FormControl>
-              <FormLabel>Notes</FormLabel>
-              <Textarea 
-                placeholder="Add notes about this time entry" 
+              <FormLabel fontSize={{ base: 'sm', md: 'md' }}>Notes</FormLabel>
+              <Textarea
+                placeholder="Add notes about this time entry"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                size={{ base: 'lg', md: 'md' }}
               />
             </FormControl>
             
@@ -1033,50 +1162,65 @@ const TimeTracking = () => {
               </Text>
             )}
             
-            <HStack spacing={4}>
+            <Stack direction={{ base: 'column', sm: 'row' }} spacing={{ base: 2, md: 4 }}>
               {activeEntry ? (
-                <Button 
-                  leftIcon={<MdStop />} 
-                  colorScheme="red" 
+                <Button
+                  leftIcon={<MdStop />}
+                  colorScheme="red"
                   onClick={handleStopTimer}
+                  w={{ base: 'full', sm: 'auto' }}
+                  size={{ base: 'lg', md: 'md' }}
+                  h={{ base: '52px', md: '40px' }}
                 >
                   Stop Timer
                 </Button>
               ) : (
-                <Button 
-                  leftIcon={<MdPlayArrow />} 
+                <Button
+                  leftIcon={<MdPlayArrow />}
                   colorScheme="green"
                   onClick={handleStartTimer}
+                  w={{ base: 'full', sm: 'auto' }}
+                  size={{ base: 'lg', md: 'md' }}
+                  h={{ base: '52px', md: '40px' }}
                 >
                   {selectedTimeEntry ? 'Resume Timer' : 'Start Timer'}
                 </Button>
               )}
-              
-              <Button 
+
+              <Button
                 colorScheme="blue"
                 onClick={handleSaveTimeEntry}
                 disabled={activeEntry !== null}
+                w={{ base: 'full', sm: 'auto' }}
+                size={{ base: 'lg', md: 'md' }}
+                h={{ base: '52px', md: '40px' }}
               >
                 {selectedTimeEntry ? 'Update Entry' : 'Save Entry'}
               </Button>
-            </HStack>
+            </Stack>
             
             {activeEntry && (
-              <Box p={3} bg="green.50" borderRadius="md">
-                <Flex justify="space-between" align="center">
-                  <Box>
-                    <Text fontWeight="bold">Timer Running</Text>
-                    <Text>{activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {typeof activeEntry.task === 'string' ? activeEntry.task : activeEntry.task?.name}</Text>
-                    <Text fontSize="sm" color="gray.600">{activeEntry.notes}</Text>
+              <Box p={{ base: 4, md: 3 }} bg="green.50" borderRadius="md">
+                <Flex justify="space-between" align="center" direction={{ base: 'column', sm: 'row' }} gap={2}>
+                  <Box textAlign={{ base: 'center', sm: 'left' }} w="full">
+                    <Flex justify={{ base: 'center', sm: 'flex-start' }} align="center" gap={2} mb={1}>
+                      <Text fontWeight="bold" fontSize={{ base: 'md', md: 'md' }}>Timer Running</Text>
+                      <Badge colorScheme="green" p={1} borderRadius="md" fontSize="xs">
+                        Running
+                      </Badge>
+                    </Flex>
+                    <Text fontSize={{ base: 'sm', md: 'md' }} noOfLines={1}>
+                      {activeEntry.projectName || activeEntry.project?.name || 'Unknown Project'} - {typeof activeEntry.task === 'string' ? activeEntry.task : activeEntry.task?.name}
+                    </Text>
+                    {activeEntry.notes && (
+                      <Text fontSize="sm" color="gray.600" noOfLines={1}>{activeEntry.notes}</Text>
+                    )}
                     {activeEntry.startTime && (
-                      <Text fontSize="lg" fontWeight="bold" color="green.600">
+                      <Text fontSize={{ base: '2xl', md: 'lg' }} fontWeight="bold" color="green.600" mt={1}>
                         {formatTime(getElapsedTime(activeEntry.startTime, activeEntry.duration || 0))}
                       </Text>
                     )}
                   </Box>
-                  <Badge colorScheme="green" p={2} borderRadius="md">
-                    Running
-                  </Badge>
                 </Flex>
               </Box>
             )}
@@ -1085,58 +1229,63 @@ const TimeTracking = () => {
       </Card>
 
       {/* フィルタ */}
-      <Flex mb={4} align="center" justify="space-between" wrap="wrap" gap={4}>
-        <HStack spacing={4} wrap="wrap">
-          <HStack spacing={2}>
-            <Text fontWeight="medium">Client:</Text>
-            <Select
-              placeholder="All Clients"
-              value={filterClientId}
-              onChange={(e) => {
-                setFilterClientId(e.target.value);
-                setCurrentPage(1); // フィルタ変更時にページをリセット
-              }}
-              w="200px"
-            >
-              {clients.map(client => (
-                <option key={client._id || client.id} value={client._id || client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </Select>
-          </HStack>
-          <HStack spacing={2}>
-            <Text fontWeight="medium">Project:</Text>
-            <Select
-              placeholder="All Projects"
-              value={filterProjectId}
-              onChange={(e) => {
-                setFilterProjectId(e.target.value);
-                setCurrentPage(1); // フィルタ変更時にページをリセット
-              }}
-              w="200px"
-            >
-              {projects.map(project => (
-                <option key={project._id || project.id} value={project._id || project.id}>
-                  {project.code ? `[${project.code}] ` : ''}{project.name}
-                </option>
-              ))}
-            </Select>
-          </HStack>
-          {(filterProjectId || filterClientId) && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setFilterProjectId('');
-                setFilterClientId('');
-              }}
-            >
-              Clear Filters
-            </Button>
-          )}
-        </HStack>
-      </Flex>
+      <Stack direction={{ base: 'column', md: 'row' }} mb={4} spacing={{ base: 2, md: 4 }} align={{ base: 'stretch', md: 'center' }}>
+        <Stack direction={{ base: 'column', sm: 'row' }} spacing={{ base: 2, md: 4 }} flex="1">
+          <FormControl>
+            <Stack direction="row" align="center" spacing={2}>
+              <Text fontWeight="medium" whiteSpace="nowrap" fontSize="sm">Client:</Text>
+              <Select
+                placeholder="All Clients"
+                value={filterClientId}
+                onChange={(e) => {
+                  setFilterClientId(e.target.value);
+                  setCurrentPage(1);
+                }}
+                size={{ base: 'md', md: 'md' }}
+              >
+                {clients.map(client => (
+                  <option key={client._id || client.id} value={client._id || client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </Select>
+            </Stack>
+          </FormControl>
+          <FormControl>
+            <Stack direction="row" align="center" spacing={2}>
+              <Text fontWeight="medium" whiteSpace="nowrap" fontSize="sm">Project:</Text>
+              <Select
+                placeholder="All Projects"
+                value={filterProjectId}
+                onChange={(e) => {
+                  setFilterProjectId(e.target.value);
+                  setCurrentPage(1);
+                }}
+                size={{ base: 'md', md: 'md' }}
+              >
+                {projects.map(project => (
+                  <option key={project._id || project.id} value={project._id || project.id}>
+                    {project.code ? `[${project.code}] ` : ''}{project.name}
+                  </option>
+                ))}
+              </Select>
+            </Stack>
+          </FormControl>
+        </Stack>
+        {(filterProjectId || filterClientId) && (
+          <Button
+            size={{ base: 'md', md: 'sm' }}
+            variant="ghost"
+            onClick={() => {
+              setFilterProjectId('');
+              setFilterClientId('');
+            }}
+            alignSelf={{ base: 'flex-start', md: 'center' }}
+          >
+            Clear Filters
+          </Button>
+        )}
+      </Stack>
 
       <Tabs variant="enclosed" mb={8} index={tabIndex} onChange={(index) => {
         setTabIndex(index);
@@ -1147,67 +1296,26 @@ const TimeTracking = () => {
           fetchTimeEntriesByPeriod(period);
         }
       }}>
-        <TabList>
-          <Tab>Day</Tab>
-          <Tab>Week</Tab>
-          <Tab>Month</Tab>
-          <Tab>All Entries</Tab>
+        <TabList overflowX="auto" flexWrap={{ base: 'nowrap', md: 'wrap' }}>
+          <Tab fontSize={{ base: 'sm', md: 'md' }} whiteSpace="nowrap">Day</Tab>
+          <Tab fontSize={{ base: 'sm', md: 'md' }} whiteSpace="nowrap">Week</Tab>
+          <Tab fontSize={{ base: 'sm', md: 'md' }} whiteSpace="nowrap">Month</Tab>
+          <Tab fontSize={{ base: 'sm', md: 'md' }} whiteSpace="nowrap">All</Tab>
         </TabList>
         
         <TabPanels>
-          <TabPanel>
+          <TabPanel px={{ base: 0, md: 4 }}>
             {isLoading ? (
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
             ) : getTodayEntries().length > 0 ? (
               <>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Date</Th>
-                      <Th>Project</Th>
-                      <Th>Task</Th>
-                      <Th>Notes</Th>
-                      <Th>Duration</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {getTodayEntries().map(entry => (
-                      <Tr key={entry._id || entry.id}>
-                        <Td>{entry.date}</Td>
-                        <Td>{getProjectDisplayName(entry)}</Td>
-                        <Td>{getTaskDisplayName(entry)}</Td>
-                        <Td>{entry.notes || entry.description || '-'}</Td>
-                        <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <IconButton
-                              aria-label="Edit"
-                              icon={<MdEdit />}
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditEntry(entry)}
-                            />
-                            <IconButton
-                              aria-label="Delete"
-                              icon={<MdDelete />}
-                              size="sm"
-                              variant="ghost"
-                              colorScheme="red"
-                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                            />
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
+                {renderEntries(getTodayEntries())}
                 <Box mt={4} p={4} bg="gray.50" borderRadius="md">
                   <Flex justify="space-between" align="center">
-                    <Text fontWeight="bold" fontSize="lg">Total:</Text>
-                    <Text fontWeight="bold" fontSize="lg" color="blue.600">
+                    <Text fontWeight="bold" fontSize={{ base: 'md', md: 'lg' }}>Total:</Text>
+                    <Text fontWeight="bold" fontSize={{ base: 'md', md: 'lg' }} color="blue.600">
                       {calculateTotalDuration(getTodayEntries())}
                     </Text>
                   </Flex>
@@ -1218,59 +1326,18 @@ const TimeTracking = () => {
             )}
           </TabPanel>
           
-          <TabPanel>
+          <TabPanel px={{ base: 0, md: 4 }}>
             {isLoading ? (
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
             ) : getWeekEntries().length > 0 ? (
               <>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Date</Th>
-                      <Th>Project</Th>
-                      <Th>Task</Th>
-                      <Th>Notes</Th>
-                      <Th>Duration</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {getWeekEntries().map(entry => (
-                      <Tr key={entry._id || entry.id}>
-                        <Td>{entry.date}</Td>
-                        <Td>{getProjectDisplayName(entry)}</Td>
-                        <Td>{getTaskDisplayName(entry)}</Td>
-                        <Td>{entry.notes || entry.description || '-'}</Td>
-                        <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <IconButton
-                              aria-label="Edit"
-                              icon={<MdEdit />}
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditEntry(entry)}
-                            />
-                            <IconButton
-                              aria-label="Delete"
-                              icon={<MdDelete />}
-                              size="sm"
-                              variant="ghost"
-                              colorScheme="red"
-                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                            />
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
+                {renderEntries(getWeekEntries())}
                 <Box mt={4} p={4} bg="gray.50" borderRadius="md">
                   <Flex justify="space-between" align="center">
-                    <Text fontWeight="bold" fontSize="lg">Total:</Text>
-                    <Text fontWeight="bold" fontSize="lg" color="blue.600">
+                    <Text fontWeight="bold" fontSize={{ base: 'md', md: 'lg' }}>Total:</Text>
+                    <Text fontWeight="bold" fontSize={{ base: 'md', md: 'lg' }} color="blue.600">
                       {calculateTotalDuration(getWeekEntries())}
                     </Text>
                   </Flex>
@@ -1281,59 +1348,18 @@ const TimeTracking = () => {
             )}
           </TabPanel>
           
-          <TabPanel>
+          <TabPanel px={{ base: 0, md: 4 }}>
             {isLoading ? (
               <Flex justify="center" p={10}>
                 <Spinner />
               </Flex>
             ) : getMonthEntries().length > 0 ? (
               <>
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Date</Th>
-                      <Th>Project</Th>
-                      <Th>Task</Th>
-                      <Th>Notes</Th>
-                      <Th>Duration</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {getMonthEntries().map(entry => (
-                      <Tr key={entry._id || entry.id}>
-                        <Td>{entry.date}</Td>
-                        <Td>{getProjectDisplayName(entry)}</Td>
-                        <Td>{getTaskDisplayName(entry)}</Td>
-                        <Td>{entry.notes || entry.description || '-'}</Td>
-                        <Td>{entry.isRunning ? formatTime(getElapsedTime(entry.startTime, entry.duration || 0)) : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <IconButton
-                              aria-label="Edit"
-                              icon={<MdEdit />}
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditEntry(entry)}
-                            />
-                            <IconButton
-                              aria-label="Delete"
-                              icon={<MdDelete />}
-                              size="sm"
-                              variant="ghost"
-                              colorScheme="red"
-                              onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                            />
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
+                {renderEntries(getMonthEntries())}
                 <Box mt={4} p={4} bg="gray.50" borderRadius="md">
                   <Flex justify="space-between" align="center">
-                    <Text fontWeight="bold" fontSize="lg">Total:</Text>
-                    <Text fontWeight="bold" fontSize="lg" color="blue.600">
+                    <Text fontWeight="bold" fontSize={{ base: 'md', md: 'lg' }}>Total:</Text>
+                    <Text fontWeight="bold" fontSize={{ base: 'md', md: 'lg' }} color="blue.600">
                       {calculateTotalDuration(getMonthEntries())}
                     </Text>
                   </Flex>
@@ -1344,7 +1370,7 @@ const TimeTracking = () => {
             )}
           </TabPanel>
           
-          <TabPanel>
+          <TabPanel px={{ base: 0, md: 4 }}>
             {(() => {
               const filteredAllEntries = applyFilters(timeEntries);
               const sortedEntries = filteredAllEntries.sort((a, b) => {
@@ -1364,52 +1390,11 @@ const TimeTracking = () => {
                 </Flex>
               ) : sortedEntries.length > 0 ? (
                 <>
-                  <Table variant="simple">
-                    <Thead>
-                      <Tr>
-                        <Th>Date</Th>
-                        <Th>Project</Th>
-                        <Th>Task</Th>
-                        <Th>Notes</Th>
-                        <Th>Duration</Th>
-                        <Th>Actions</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {paginatedEntries.map(entry => (
-                        <Tr key={entry._id || entry.id}>
-                          <Td>{entry.date}</Td>
-                          <Td>{getProjectDisplayName(entry)}</Td>
-                          <Td>{getTaskDisplayName(entry)}</Td>
-                          <Td>{entry.notes || '-'}</Td>
-                          <Td>{entry.isRunning ? 'Running' : (entry.hours !== undefined && entry.hours !== null && entry.hours > 0 ? formatTime(entry.hours * 3600) : formatTime(entry.duration || 0))}</Td>
-                          <Td>
-                            <HStack spacing={2}>
-                              <IconButton
-                                aria-label="Edit"
-                                icon={<MdEdit />}
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEditEntry(entry)}
-                              />
-                              <IconButton
-                                aria-label="Delete"
-                                icon={<MdDelete />}
-                                size="sm"
-                                variant="ghost"
-                                colorScheme="red"
-                                onClick={() => handleDeleteEntry(entry._id || entry.id)}
-                              />
-                            </HStack>
-                          </Td>
-                        </Tr>
-                      ))}
-                    </Tbody>
-                  </Table>
+                  {renderEntries(paginatedEntries)}
 
                   {sortedEntries.length > entriesPerPage && (
-                    <Flex justify="center" mt={4}>
-                      <ButtonGroup size="sm" spacing={2}>
+                    <Flex justify="center" mt={4} wrap="wrap" gap={2}>
+                      <ButtonGroup size="sm" spacing={2} flexWrap="wrap">
                         <Button
                           onClick={() => setCurrentPage(1)}
                           isDisabled={currentPage === 1}
@@ -1422,7 +1407,7 @@ const TimeTracking = () => {
                         >
                           Previous
                         </Button>
-                        <Text alignSelf="center" px={4}>
+                        <Text alignSelf="center" px={4} fontSize="sm">
                           Page {currentPage} of {totalPages}
                         </Text>
                         <Button

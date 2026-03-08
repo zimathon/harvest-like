@@ -55,12 +55,12 @@ const Login = () => {
   };
 
   return (
-    <Flex minH="100vh" alignItems="center" justifyContent="center" bg="gray.50">
-      <Container maxW="md" p={8} bg="white" borderRadius="md" boxShadow="md">
+    <Flex minH="100vh" alignItems="center" justifyContent="center" bg="gray.50" px={{ base: 4, md: 0 }}>
+      <Container maxW="md" p={{ base: 6, md: 8 }} bg="white" borderRadius="md" boxShadow="md" w="full">
         <VStack spacing={6} align="stretch">
           <Box textAlign="center">
-            <Heading mb={2}>Harvest-like</Heading>
-            <Text color="gray.600">Sign in to your account</Text>
+            <Heading mb={2} size={{ base: 'lg', md: 'xl' }}>Harvest-like</Heading>
+            <Text color="gray.600" fontSize={{ base: 'sm', md: 'md' }}>Sign in to your account</Text>
           </Box>
 
           <Box as="form" onSubmit={handleSubmit}>
@@ -72,19 +72,23 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your.email@example.com"
+                  size={{ base: 'lg', md: 'md' }}
+                  autoComplete="email"
+                  autoCapitalize="none"
                 />
               </FormControl>
 
               <FormControl id="password" isRequired>
                 <FormLabel>Password</FormLabel>
-                <InputGroup>
+                <InputGroup size={{ base: 'lg', md: 'md' }}>
                   <Input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
+                    autoComplete="current-password"
                   />
-                  <InputRightElement>
+                  <InputRightElement h="full">
                     <Button
                       variant="ghost"
                       onClick={() => setShowPassword(!showPassword)}
@@ -106,6 +110,8 @@ const Login = () => {
                 mt={4}
                 type="submit"
                 isLoading={isLoading}
+                size="lg"
+                h={{ base: '52px', md: '44px' }}
               >
                 Sign In
               </Button>
