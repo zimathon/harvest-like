@@ -278,7 +278,7 @@ const TimeTracking = () => {
   });
   const [duration, setDuration] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [tabIndex, setTabIndex] = useState<number>(0);
+  const [tabIndex, setTabIndex] = useState<number>(1);
   const [selectedTimeEntry, setSelectedTimeEntry] = useState<TimeEntry | null>(null); // 編集用
   const [currentTime, setCurrentTime] = useState<Date>(new Date()); // リアルタイム時間表示用
   const [currentPage, setCurrentPage] = useState<number>(1);
